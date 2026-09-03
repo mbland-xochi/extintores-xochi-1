@@ -238,6 +238,10 @@
     <div class="route-strip" id="routeStrip"></div>
   </header>
 
+  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+    <button class="btn ghost" id="seedDefaults" style="font-size:12.5px;padding:7px 13px;">Cargar extintores por defecto</button>
+  </div>
+
   <div class="alertbar" id="alertBar"></div>
 
   <div id="areasRoot" class="loading">Conectando con la base de datos…</div>
@@ -373,6 +377,33 @@
 (function(){
   const LOCATIONS = ["KM145","KM152","KM162","KM170"];
   const AREAS = ["Oficinas","Garitas","Generador"];
+
+  // ===== EXTINTORES POR DEFECTO =====
+  // Plantilla de arranque: un extintor por ubicación/área, con tipo y capacidad sugeridos
+  // según NFPA 10 (Oficinas: PQS 10 lb · Garitas: PQS 5-9 lb · Generador: PQS 20 lb por
+  // riesgo Clase B/C). Edite código, capacidad o tipo aquí si su lista real difiere, o
+  // simplemente cárguelos y corrija cada uno desde la pestaña "Datos" del panel.
+  const DEFAULT_EXTINGUISHERS = [];
+  (function buildDefaults(){
+    const AREA_ABBR = { "Oficinas":"OF", "Garitas":"GA", "Generador":"GE" };
+    const AREA_SPEC = {
+      "Oficinas": { tipo:"PQS", capacidad:"10 lb" },
+      "Garitas": { tipo:"PQS", capacidad:"5 lb" },
+      "Generador": { tipo:"PQS", capacidad:"20 lb" }
+    };
+    ["KM145","KM152","KM162","KM170"].forEach(loc=>{
+      ["Oficinas","Garitas","Generador"].forEach(area=>{
+        const spec = AREA_SPEC[area];
+        DEFAULT_EXTINGUISHERS.push({
+          location: loc, area: area,
+          code: `EXT-${loc}-${AREA_ABBR[area]}-01`,
+          tipo: spec.tipo, capacidad: spec.capacidad,
+          vencimiento: "", ubicacion: ""
+        });
+      });
+    });
+  })();
+
   const CHECKLIST_DEFS = [
     ["visible","Extintor en su ubicación designada y visible"],
     ["acceso","Acceso libre, sin obstrucciones"],
@@ -583,6 +614,24 @@
     renderAlertBar();
     renderAreas();
   }
+
+  $("#seedDefaults").onclick = async ()=>{
+    const missing = DEFAULT_EXTINGUISHERS.filter(def =>
+      !data.extinguishers.some(e => e.location===def.location && e.area===def.area)
+    );
+    if(missing.length === 0){
+      toast("Ya existe al menos un extintor en cada ubicación/área.");
+      return;
+    }
+    if(!confirm(`Se agregarán ${missing.length} extintores base (uno por ubicación/área sin registrar aún). Podrá editar código, capacidad y vencimiento de cada uno después. ¿Continuar?`)) return;
+    for(const def of missing){
+      const ext = { id: uid(), usado:false, fabricacion:"", ...def };
+      data.extinguishers.push(ext);
+      await apiPost('addExt', ext);
+    }
+    renderAll();
+    toast(`${missing.length} extintores base agregados. Edite cada uno para poner el código real y la fecha de vencimiento.`);
+  };
 
   // ---------- add extinguisher modal ----------
   function openAddModal(area){
