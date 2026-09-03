@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Extintores · Xochi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#15171B;
+    --surface:#1D2024;
+    --surface-2:#252932;
+    --surface-3:#2C313B;
+    --line:#363B44;
+    --ink:#EDEBE6;
+    --ink-dim:#9CA3AD;
+    --ink-faint:#6B7280;
+    --red:#D0332C;
+    --red-dim:#4A2320;
+    --amber:#DE9B2A;
+    --amber-dim:#463320;
+    --orange:#D9711F;
+    --orange-dim:#4A2C16;
+    --green:#3F9E5C;
+    --green-dim:#1F3A28;
+    --focus:#7FB0D6;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3,.mono-head{font-family:'Oswald',system-ui,sans-serif;}
+  button{font-family:inherit;}
+  ::selection{background:var(--red);color:#fff;}
+  a{color:var(--focus);}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
+
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    flex-wrap:wrap;gap:14px;margin-bottom:22px;
+    border-bottom:1px solid var(--line);padding-bottom:18px;
+  }
+  .title-block h1{
+    font-size:26px;font-weight:600;letter-spacing:.3px;margin:0 0 4px;
+    color:var(--ink);
+  }
+  .title-block h1 span{color:var(--red);}
+  .title-block .sub{color:var(--ink-dim);font-size:13.5px;}
+  .route-strip{display:flex;align-items:center;gap:0;}
+  .route-strip .km{
+    position:relative;padding:7px 14px;font-size:13px;font-weight:600;
+    color:var(--ink-dim);cursor:pointer;border-bottom:3px solid transparent;
+    transition:color .15s, border-color .15s;white-space:nowrap;
+  }
+  .route-strip .km:hover{color:var(--ink);}
+  .route-strip .km.active{color:var(--ink);border-color:var(--red);}
+  .route-strip .km .dot{
+    display:inline-block;width:6px;height:6px;border-radius:50%;
+    margin-right:6px;background:var(--ink-faint);position:relative;top:-1px;
+  }
+  .route-strip .km .dot.ok{background:var(--green);}
+  .route-strip .km .dot.warn2{background:var(--amber);}
+  .route-strip .km .dot.warn1{background:var(--orange);}
+  .route-strip .km .dot.bad{background:var(--red);}
+
+  /* ---------- Alert banner ---------- */
+  .alertbar{
+    display:none;background:var(--red-dim);border:1px solid #5C2822;
+    border-radius:var(--radius);padding:12px 16px;margin-bottom:20px;
+    font-size:13.5px;color:#F3C9C6;
+  }
+  .alertbar.show{display:block;}
+  .alertbar strong{color:#fff;}
+  .alertbar .line{margin-bottom:4px;}
+  .alertbar .line:last-child{margin-bottom:0;}
+
+  /* ---------- Area layout ---------- */
+  .areas{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media(max-width:860px){.areas{grid-template-columns:1fr;}}
+  .area{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:16px;
+  }
+  .area-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .area-head h2{font-size:15px;font-weight:600;margin:0;letter-spacing:.2px;}
+  .area-count{font-size:12px;color:var(--ink-faint);}
+  .add-ext{
+    width:100%;border:1px dashed var(--line);background:transparent;
+    color:var(--ink-dim);border-radius:8px;padding:9px;font-size:12.5px;
+    cursor:pointer;margin-top:8px;transition:border-color .15s,color .15s;
+  }
+  .add-ext:hover{border-color:var(--ink-faint);color:var(--ink);}
+
+  .ext-card{
+    background:var(--surface-2);border:1px solid var(--line);
+    border-radius:8px;padding:11px 12px;margin-bottom:9px;cursor:pointer;
+    transition:border-color .15s, transform .1s;
+  }
+  .ext-card:hover{border-color:var(--ink-faint);}
+  .ext-card:active{transform:scale(.99);}
+  .ext-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .ext-code{font-size:13.5px;font-weight:600;}
+  .ext-type{font-size:11.5px;color:var(--ink-dim);margin-top:2px;}
+  .badge{
+    font-size:10.5px;font-weight:700;letter-spacing:.3px;padding:3px 8px;
+    border-radius:20px;white-space:nowrap;
+  }
+  .badge.ok{background:var(--green-dim);color:#8FD6A3;}
+  .badge.warn2{background:var(--amber-dim);color:#F0C374;}
+  .badge.warn1{background:var(--orange-dim);color:#F0A876;}
+  .badge.bad{background:var(--red-dim);color:#F3B0AC;}
+  .ext-meta{font-size:11px;color:var(--ink-faint);margin-top:6px;}
+  .used-banner{
+    background:var(--red-dim);border:1px solid #5C2822;border-radius:8px;
+    padding:10px 12px;font-size:12.5px;color:#F3C9C6;margin-bottom:14px;
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+  }
+  .used-banner button{flex-shrink:0;}
+
+  /* ---------- Detail panel (slide-over) ---------- */
+  .scrim{
+    display:none;position:fixed;inset:0;background:rgba(10,11,13,.6);
+    z-index:40;
+  }
+  .scrim.show{display:block;}
+  .panel{
+    position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);
+    background:var(--surface);border-left:1px solid var(--line);
+    z-index:41;transform:translateX(100%);transition:transform .22s ease;
+    display:flex;flex-direction:column;
+  }
+  .panel.show{transform:translateX(0);}
+  .panel-head{
+    padding:18px 20px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
+  }
+  .panel-head h2{font-size:18px;margin:0 0 3px;font-weight:600;}
+  .panel-head .meta{font-size:12.5px;color:var(--ink-dim);}
+  .close-x{background:none;border:none;color:var(--ink-dim);font-size:22px;cursor:pointer;line-height:1;padding:2px 4px;}
+  .close-x:hover{color:var(--ink);}
+  .panel-body{padding:18px 20px;overflow-y:auto;flex:1;}
+  .panel-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;}
+
+  .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--line);}
+  .tab{
+    padding:8px 12px;font-size:13px;color:var(--ink-dim);cursor:pointer;
+    border-bottom:2px solid transparent;font-weight:500;
+  }
+  .tab.active{color:var(--ink);border-color:var(--red);}
+  .tabpage{display:none;}
+  .tabpage.active{display:block;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;color:var(--ink-dim);margin-bottom:5px;font-weight:500;}
+  .field input[type=text],.field input[type=date],.field input[type=number],.field select,.field textarea{
+    width:100%;background:var(--surface-3);border:1px solid var(--line);
+    color:var(--ink);border-radius:7px;padding:9px 10px;font-size:14px;font-family:inherit;
+  }
+  .field textarea{resize:vertical;min-height:60px;}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--focus);outline-offset:0;border-color:transparent;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+  .checklist-item{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 0;border-bottom:1px solid var(--line);
+  }
+  .checklist-item:last-child{border-bottom:none;}
+  .checklist-item .ci-label{font-size:13.5px;flex:1;}
+  .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex-shrink:0;}
+  .seg button{
+    padding:6px 12px;font-size:12px;font-weight:600;background:var(--surface-3);
+    color:var(--ink-dim);border:none;cursor:pointer;border-right:1px solid var(--line);
+  }
+  .seg button:last-child{border-right:none;}
+  .seg button.sel-ok.active{background:var(--green-dim);color:#8FD6A3;}
+  .seg button.sel-bad.active{background:var(--red-dim);color:#F3B0AC;}
+
+  .btn{
+    border:none;border-radius:7px;padding:9px 16px;font-size:13.5px;font-weight:600;
+    cursor:pointer;transition:opacity .15s;
+  }
+  .btn:hover{opacity:.88;}
+  .btn.primary{background:var(--red);color:#fff;}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink-dim);}
+  .btn.ghost:hover{color:var(--ink);border-color:var(--ink-faint);}
+  .btn.subtle{background:var(--surface-3);color:var(--ink);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .sig-wrap{border:1px solid var(--line);border-radius:7px;background:var(--surface-3);}
+  canvas.sig{width:100%;height:130px;display:block;touch-action:none;border-radius:7px;}
+  .sig-actions{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+  .sig-actions span{font-size:11px;color:var(--ink-faint);}
+
+  .hist-item{
+    border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;
+    background:var(--surface-2);
+  }
+  .hist-item .hh{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;}
+  .hist-item .hh .who{color:var(--ink-dim);}
+  .hist-item .issues{font-size:12px;color:#F3B0AC;margin-top:4px;}
+  .hist-empty{color:var(--ink-faint);font-size:13px;padding:16px 0;text-align:center;}
+
+  .footnote{font-size:11.5px;color:var(--ink-faint);margin-top:24px;text-align:center;line-height:1.6;}
+
+  /* modal (add extinguisher) */
+  .modal-scrim{display:none;position:fixed;inset:0;background:rgba(10,11,13,.6);z-index:50;align-items:center;justify-content:center;}
+  .modal-scrim.show{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;width:min(420px,92vw);}
+  .modal h3{margin:0 0 16px;font-size:16px;}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--surface-3);border:1px solid var(--line);color:var(--ink);
+    padding:11px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;
+    transition:opacity .2s, transform .2s;z-index:60;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .loading{padding:60px 0;text-align:center;color:var(--ink-faint);font-size:13px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title-block">
+      <h1>Extintores <span>·</span> Xochi</h1>
+      <div class="sub">CA-2 KM142–KM173 · Inspección mensual y mantenimiento anual</div>
+    </div>
+    <div class="route-strip" id="routeStrip"></div>
+  </header>
+
+  <div class="alertbar" id="alertBar"></div>
+
+  <div id="areasRoot" class="loading">Conectando con la base de datos…</div>
+
+  <div class="footnote">Checklist mensual basado en criterios de inspección visual NFPA 10.<br>Los datos se guardan compartidos para todo el equipo Xochi.</div>
+</div>
+
+<!-- Slide-over detail panel -->
+<div class="scrim" id="scrim"></div>
+<div class="panel" id="panel">
+  <div class="panel-head">
+    <div>
+      <h2 id="panelTitle">—</h2>
+      <div class="meta" id="panelMeta">—</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="btn subtle" id="reportUso" style="padding:6px 11px;font-size:12px;">Reportar uso</button>
+      <button class="close-x" id="closePanel">&times;</button>
+    </div>
+  </div>
+  <div class="panel-body">
+    <div id="usedBanner"></div>
+    <div class="tabs">
+      <div class="tab active" data-tab="monthly">Inspección mensual</div>
+      <div class="tab" data-tab="annual">Mantenimiento anual</div>
+      <div class="tab" data-tab="history">Historial</div>
+      <div class="tab" data-tab="info">Datos</div>
+    </div>
+
+    <div class="tabpage active" id="tab-monthly">
+      <div class="field"><label>Inspector</label><input type="text" id="mInspector" placeholder="Nombre y apellido"></div>
+      <div class="field"><label>Fecha</label><input type="date" id="mDate"></div>
+      <div id="checklistItems"></div>
+      <div class="field" style="margin-top:14px;"><label>Observaciones</label><textarea id="mObs" placeholder="Detalle de no conformidades, si aplica"></textarea></div>
+      <div class="field">
+        <label>Firma del inspector</label>
+        <div class="sig-wrap"><canvas class="sig" id="mSig"></canvas></div>
+        <div class="sig-actions"><span>Dibuje con el dedo o el mouse</span><button class="btn ghost" id="mSigClear" style="padding:4px 10px;font-size:11px;">Limpiar</button></div>
+      </div>
+    </div>
+
+    <div class="tabpage" id="tab-annual">
+      <div class="row2">
+        <div class="field"><label>Fecha de mantenimiento</label><input type="date" id="aDate"></div>
+        <div class="field"><label>Peso verificado (lb)</label><input type="number" step="0.1" id="aPeso"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Empresa / técnico certificado</label><input type="text" id="aTecnico" placeholder="Nombre de empresa o técnico"></div>
+        <div class="field"><label>N.º certificado / orden</label><input type="text" id="aCert"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>¿Se realizó recarga?</label>
+          <select id="aRecarga"><option value="no">No</option><option value="si">Sí</option></select>
+        </div>
+        <div class="field"><label>Prueba hidrostática realizada</label>
+          <select id="aHidro"><option value="no">No aplica / No</option><option value="si">Sí</option></select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Próxima prueba hidrostática</label><input type="date" id="aProxHidro"></div>
+        <div class="field"><label>Próximo mantenimiento anual</label><input type="date" id="aProxMant"></div>
+      </div>
+      <div class="field"><label>Observaciones</label><textarea id="aObs"></textarea></div>
+      <div class="field">
+        <label>Firma del técnico / responsable</label>
+        <div class="sig-wrap"><canvas class="sig" id="aSig"></canvas></div>
+        <div class="sig-actions"><span>Dibuje con el dedo o el mouse</span><button class="btn ghost" id="aSigClear" style="padding:4px 10px;font-size:11px;">Limpiar</button></div>
+      </div>
+    </div>
+
+    <div class="tabpage" id="tab-history">
+      <div id="historyList"></div>
+    </div>
+
+    <div class="tabpage" id="tab-info">
+      <div class="row2">
+        <div class="field"><label>Tipo de agente</label>
+          <select id="iTipo"><option>PQS</option><option>CO2</option><option>Agua</option><option>Espuma AFFF</option><option>Clase K</option></select>
+        </div>
+        <div class="field"><label>Capacidad</label><input type="text" id="iCapacidad" placeholder="ej. 10 lb"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Fecha de fabricación</label><input type="date" id="iFabricacion"></div>
+        <div class="field"><label>Vencimiento de recarga</label><input type="date" id="iVencimiento"></div>
+      </div>
+      <div class="field"><label>Ubicación física exacta</label><input type="text" id="iUbicacion" placeholder="ej. pasillo de garita, junto a puerta principal"></div>
+      <button class="btn ghost" id="deleteExt" style="width:100%;margin-top:6px;color:#F3B0AC;border-color:#5C2822;">Eliminar este extintor</button>
+    </div>
+  </div>
+  <div class="panel-foot">
+    <button class="btn ghost" id="cancelSave">Cerrar</button>
+    <button class="btn primary" id="saveActive">Guardar</button>
+  </div>
+</div>
+
+<!-- Add extinguisher modal -->
+<div class="modal-scrim" id="addScrim">
+  <div class="modal">
+    <h3>Nuevo extintor</h3>
+    <div class="field"><label>Código / ID</label><input type="text" id="newCode" placeholder="ej. EXT-145-OF-01"></div>
+    <div class="row2">
+      <div class="field"><label>Tipo de agente</label>
+        <select id="newTipo"><option>PQS</option><option>CO2</option><option>Agua</option><option>Espuma AFFF</option><option>Clase K</option></select>
+      </div>
+      <div class="field"><label>Capacidad</label><input type="text" id="newCapacidad" placeholder="ej. 10 lb"></div>
+    </div>
+    <div class="field"><label>Vencimiento de recarga</label><input type="date" id="newVencimiento"></div>
+    <div class="field"><label>Ubicación de instalación</label><input type="text" id="newUbicacion" placeholder="ej. pasillo de garita, junto a puerta principal"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px;">
+      <button class="btn ghost" id="cancelAdd">Cancelar</button>
+      <button class="btn primary" id="confirmAdd">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Report usage modal -->
+<div class="modal-scrim" id="usoScrim">
+  <div class="modal">
+    <h3>Reportar uso de extintor</h3>
+    <div class="field"><label>Fecha de uso</label><input type="date" id="usoFecha"></div>
+    <div class="field"><label>Reportado por</label><input type="text" id="usoReportero" placeholder="Nombre y apellido"></div>
+    <div class="field"><label>Motivo / observación</label><textarea id="usoObs" placeholder="ej. conato de incendio en generador, se descargó parcialmente"></textarea></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px;">
+      <button class="btn ghost" id="cancelUso">Cancelar</button>
+      <button class="btn primary" id="confirmUso">Registrar uso</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const LOCATIONS = ["KM145","KM152","KM162","KM170"];
+  const AREAS = ["Oficinas","Garitas","Generador"];
+  const CHECKLIST_DEFS = [
+    ["visible","Extintor en su ubicación designada y visible"],
+    ["acceso","Acceso libre, sin obstrucciones"],
+    ["senal","Señalización / rótulo visible y en buen estado"],
+    ["presion","Manómetro en rango verde (o peso correcto en CO2)"],
+    ["pasador","Pasador de seguridad y precinto intactos"],
+    ["manguera","Manguera, boquilla y válvula sin daños"],
+    ["cuerpo","Cuerpo del cilindro sin corrosión, abolladuras ni fugas"],
+    ["etiqueta","Etiqueta de última recarga/mantenimiento legible"],
+    ["soporte","Soporte o gabinete en buen estado"]
+  ];
+  // ===== CONFIGURACIÓN: pegue aquí la URL de su Web App de Google Apps Script =====
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz7MlxptBIfgFGuXJzUXgWSp5-XD7lTwX-Rmee3SKZv0U7ANocxRP2JEGFNKN6ECpch2g/exec";
+  const DAY = 86400000;
+
+  let data = { extinguishers: [], inspections: [], maintenance: [], usageReports: [] };
+  let activeLocation = LOCATIONS[0];
+  let activeExtId = null;
+  let addingForArea = null;
+  let sigCanvases = {};
+
+  const $ = (sel, root) => (root||document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root||document).querySelectorAll(sel));
+  const uid = () => Math.random().toString(36).slice(2,10);
+  const todayISO = () => new Date().toISOString().slice(0,10);
+  const fmtDate = (iso) => { if(!iso) return "—"; const d=new Date(iso+"T00:00:00"); return d.toLocaleDateString('es-GT',{day:'2-digit',month:'short',year:'numeric'}); };
+
+  function toast(msg){
+    const t = $("#toast"); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), 2200);
+  }
+
+  // Fetches the full dataset from the Google Sheet via Apps Script.
+  async function loadData(){
+    try{
+      const res = await fetch(APPS_SCRIPT_URL, { method: 'GET' });
+      const json = await res.json();
+      data = Object.assign({extinguishers:[],inspections:[],maintenance:[],usageReports:[]}, json);
+    }catch(e){
+      console.error(e);
+      toast("No se pudo conectar con la base de datos. Verifique la URL configurada.");
+    }
+  }
+
+  // Sends one write action to the Apps Script backend. Content-Type text/plain avoids
+  // a CORS preflight request, which Apps Script Web Apps do not handle.
+  async function apiPost(action, payload){
+    try{
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, payload })
+      });
+      const json = await res.json();
+      if(!json.ok) toast("Error al guardar: " + (json.error || "intente de nuevo"));
+      return json;
+    }catch(e){
+      console.error(e);
+      toast("No se pudo conectar con la base de datos.");
+      return { ok:false };
+    }
+  }
+
+  // ---------- status computation ----------
+  function lastInspection(extId){
+    const list = data.inspections.filter(r=>r.extId===extId).sort((a,b)=>b.date.localeCompare(a.date));
+    return list[0] || null;
+  }
+  function lastMaintenance(extId){
+    const list = data.maintenance.filter(r=>r.extId===extId).sort((a,b)=>b.date.localeCompare(a.date));
+    return list[0] || null;
+  }
+  const LEVEL_ORDER = {ok:0, warn2:1, warn1:2, bad:3};
+  const LEVEL_LABEL = {ok:"AL DÍA", warn2:"VENCE EN 2 MESES", warn1:"VENCE EN 1 MES", bad:"ATENCIÓN"};
+
+  // Returns {level, reasons[]}. level is the worst of: ok < warn2 (≤60d) < warn1 (≤30d) < bad (overdue / non-conforming / used).
+  function extStatus(ext){
+    const now = new Date();
+    const monthKey = (d)=> d.slice(0,7);
+    const thisMonth = monthKey(todayISO());
+    let level = "ok";
+    const reasons = [];
+    function bump(newLevel, reason){
+      if(LEVEL_ORDER[newLevel] > LEVEL_ORDER[level]) level = newLevel;
+      reasons.push(reason);
+    }
+    function checkDate(dateStr, vencidoMsg, m1Msg, m2Msg){
+      if(!dateStr) return;
+      const days = Math.floor((new Date(dateStr) - now)/DAY);
+      if(days < 0) bump('bad', vencidoMsg);
+      else if(days <= 30) bump('warn1', m1Msg);
+      else if(days <= 60) bump('warn2', m2Msg);
+    }
+
+    if(ext.usado){
+      bump('bad', 'Reportado como usado — requiere recarga inmediata');
+    }
+    checkDate(ext.vencimiento,
+      'Vencimiento de recarga vencido',
+      'Vencimiento de recarga en menos de 1 mes',
+      'Vencimiento de recarga en menos de 2 meses');
+
+    const maint = lastMaintenance(ext.id);
+    if(maint){
+      checkDate(maint.proxHidro,
+        'Prueba hidrostática vencida',
+        'Prueba hidrostática vence en menos de 1 mes',
+        'Prueba hidrostática vence en menos de 2 meses');
+      checkDate(maint.proxMant,
+        'Mantenimiento anual vencido',
+        'Mantenimiento anual vence en menos de 1 mes',
+        'Mantenimiento anual vence en menos de 2 meses');
+    }
+
+    const insp = lastInspection(ext.id);
+    if(insp && insp.hasIssues) bump('bad', 'No conformidad en última inspección mensual');
+    if(!insp || monthKey(insp.date) !== thisMonth){
+      if(level === 'ok') level = 'warn2';
+      reasons.push('Sin inspección registrada este mes');
+    }
+    return { level, reasons };
+  }
+
+  // ---------- rendering ----------
+  function renderRouteStrip(){
+    const el = $("#routeStrip"); el.innerHTML = "";
+    LOCATIONS.forEach(loc=>{
+      const exts = data.extinguishers.filter(e=>e.location===loc);
+      let worst = "ok";
+      exts.forEach(e=>{ const s = extStatus(e).level; if(LEVEL_ORDER[s] > LEVEL_ORDER[worst]) worst = s; });
+      const dotClass = exts.length ? worst : "";
+      const div = document.createElement('div');
+      div.className = "km" + (loc===activeLocation ? " active":"");
+      div.innerHTML = `<span class="dot ${dotClass}"></span>${loc}`;
+      div.onclick = ()=>{ activeLocation = loc; renderAll(); };
+      el.appendChild(div);
+    });
+  }
+
+  function renderAlertBar(){
+    const bar = $("#alertBar");
+    const statuses = data.extinguishers.map(e=>({ext:e, s:extStatus(e)}));
+    const usadoList = statuses.filter(x=>x.ext.usado);
+    const badList = statuses.filter(x=>x.s.level==='bad' && !x.ext.usado);
+    const warn1List = statuses.filter(x=>x.s.level==='warn1');
+    const warn2List = statuses.filter(x=>x.s.level==='warn2');
+
+    if(!usadoList.length && !badList.length && !warn1List.length && !warn2List.length){
+      bar.classList.remove('show'); return;
+    }
+    const lines = [];
+    if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como usado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
+    if(badList.length) lines.push(`<div class="line"><strong>${badList.length}</strong> con fecha vencida o no conformidad sin resolver.</div>`);
+    if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
+    if(warn2List.length) lines.push(`<div class="line"><strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
+    bar.innerHTML = lines.join('');
+    bar.classList.add('show');
+  }
+
+  function renderAreas(){
+    const root = $("#areasRoot");
+    root.className = "areas";
+    root.innerHTML = "";
+    AREAS.forEach(area=>{
+      const exts = data.extinguishers.filter(e=>e.location===activeLocation && e.area===area);
+      const wrap = document.createElement('div');
+      wrap.className = "area";
+      wrap.innerHTML = `<div class="area-head"><h2>${area}</h2><span class="area-count">${exts.length}</span></div>`;
+      if(exts.length===0){
+        const p = document.createElement('div');
+        p.style.cssText = "color:var(--ink-faint);font-size:12.5px;padding:8px 0;";
+        p.textContent = "Sin extintores registrados.";
+        wrap.appendChild(p);
+      } else {
+        exts.forEach(ext=>{
+          const status = extStatus(ext);
+          const insp = lastInspection(ext.id);
+          const card = document.createElement('div');
+          card.className = "ext-card";
+          card.innerHTML = `
+            <div class="ext-top">
+              <div>
+                <div class="ext-code">${escapeHtml(ext.code||'(sin código)')}</div>
+                <div class="ext-type">${ext.tipo||''} · ${ext.capacidad||'—'}</div>
+              </div>
+              <span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>
+            </div>
+            <div class="ext-meta">${ext.ubicacion ? escapeHtml(ext.ubicacion)+' · ' : ''}Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
+            ${status.reasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(status.reasons[0])}</div>` : ''}
+          `;
+          card.onclick = ()=> openPanel(ext.id);
+          wrap.appendChild(card);
+        });
+      }
+      const addBtn = document.createElement('button');
+      addBtn.className = "add-ext";
+      addBtn.textContent = "+ Agregar extintor";
+      addBtn.onclick = ()=> openAddModal(area);
+      wrap.appendChild(addBtn);
+      root.appendChild(wrap);
+    });
+  }
+
+  function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function renderAll(){
+    renderRouteStrip();
+    renderAlertBar();
+    renderAreas();
+  }
+
+  // ---------- add extinguisher modal ----------
+  function openAddModal(area){
+    addingForArea = area;
+    $("#newCode").value = "";
+    $("#newCapacidad").value = "";
+    $("#newVencimiento").value = "";
+    $("#newUbicacion").value = "";
+    $("#newTipo").value = "PQS";
+    $("#addScrim").classList.add('show');
+    setTimeout(()=>$("#newCode").focus(), 50);
+  }
+  $("#cancelAdd").onclick = ()=> $("#addScrim").classList.remove('show');
+  $("#addScrim").addEventListener('click', (e)=>{ if(e.target.id==='addScrim') $("#addScrim").classList.remove('show'); });
+  $("#confirmAdd").onclick = async ()=>{
+    const code = $("#newCode").value.trim();
+    if(!code){ toast("Ingrese un código para el extintor."); return; }
+    const ext = {
+      id: uid(), location: activeLocation, area: addingForArea,
+      code, tipo: $("#newTipo").value, capacidad: $("#newCapacidad").value.trim(),
+      vencimiento: $("#newVencimiento").value || "", fabricacion:"",
+      ubicacion: $("#newUbicacion").value.trim(), usado:false
+    };
+    data.extinguishers.push(ext);
+    $("#addScrim").classList.remove('show');
+    renderAll();
+    const res = await apiPost('addExt', ext);
+    if(res.ok) toast("Extintor agregado.");
+  };
+
+  // ---------- detail panel ----------
+  function openPanel(extId){
+    activeExtId = extId;
+    const ext = data.extinguishers.find(e=>e.id===extId);
+    if(!ext) return;
+    $("#panelTitle").textContent = ext.code || "(sin código)";
+    $("#panelMeta").textContent = `${ext.location} · ${ext.area} · ${ext.tipo}`;
+
+    // monthly tab defaults
+    $("#mInspector").value = "";
+    $("#mDate").value = todayISO();
+    $("#mObs").value = "";
+    renderChecklist();
+    clearSig('mSig');
+
+    // annual tab defaults
+    const maint = lastMaintenance(extId);
+    $("#aDate").value = todayISO();
+    $("#aPeso").value = maint ? (maint.peso||"") : "";
+    $("#aTecnico").value = "";
+    $("#aCert").value = "";
+    $("#aRecarga").value = "no";
+    $("#aHidro").value = "no";
+    $("#aProxHidro").value = maint ? (maint.proxHidro||"") : "";
+    $("#aProxMant").value = maint ? (maint.proxMant||"") : "";
+    $("#aObs").value = "";
+    clearSig('aSig');
+
+    // info tab
+    $("#iTipo").value = ext.tipo || "PQS";
+    $("#iCapacidad").value = ext.capacidad || "";
+    $("#iFabricacion").value = ext.fabricacion || "";
+    $("#iVencimiento").value = ext.vencimiento || "";
+    $("#iUbicacion").value = ext.ubicacion || "";
+
+    renderUsedBanner(ext);
+    renderHistory(extId);
+    switchTab('monthly');
+    $("#scrim").classList.add('show');
+    $("#panel").classList.add('show');
+    setTimeout(setupSignaturePads, 60);
+  }
+
+  function renderUsedBanner(ext){
+    const el = $("#usedBanner");
+    if(!ext.usado){ el.innerHTML = ""; return; }
+    const info = ext.usadoInfo || {};
+    el.innerHTML = `
+      <div class="used-banner">
+        <span>⚠ Reportado como usado el ${fmtDate(info.date)}${info.reporter?' por '+escapeHtml(info.reporter):''}${info.obs?' — '+escapeHtml(info.obs):''}. Requiere recarga inmediata.</span>
+        <button class="btn ghost" id="clearUsado" style="padding:5px 10px;font-size:11.5px;">Marcar como recargado</button>
+      </div>`;
+    $("#clearUsado").onclick = async ()=>{
+      ext.usado = false;
+      renderAll(); renderUsedBanner(ext);
+      const res = await apiPost('clearUsado', { extId: ext.id });
+      if(res.ok) toast("Extintor marcado como recargado.");
+    };
+  }
+
+  function openUsoModal(){
+    $("#usoFecha").value = todayISO();
+    $("#usoReportero").value = "";
+    $("#usoObs").value = "";
+    $("#usoScrim").classList.add('show');
+  }
+  $("#reportUso").onclick = openUsoModal;
+  $("#cancelUso").onclick = ()=> $("#usoScrim").classList.remove('show');
+  $("#usoScrim").addEventListener('click', (e)=>{ if(e.target.id==='usoScrim') $("#usoScrim").classList.remove('show'); });
+  $("#confirmUso").onclick = async ()=>{
+    if(!activeExtId) return;
+    if(!$("#usoReportero").value.trim()){ toast("Ingrese quién reporta el uso."); return; }
+    const ext = data.extinguishers.find(e=>e.id===activeExtId);
+    if(!ext) return;
+    const usoRecord = {
+      id: uid(), extId: activeExtId,
+      date: $("#usoFecha").value || todayISO(),
+      reporter: $("#usoReportero").value.trim(),
+      obs: $("#usoObs").value.trim()
+    };
+    ext.usado = true;
+    ext.usadoInfo = { date: usoRecord.date, reporter: usoRecord.reporter, obs: usoRecord.obs };
+    data.usageReports = data.usageReports || [];
+    data.usageReports.push(usoRecord);
+    $("#usoScrim").classList.remove('show');
+    renderAll();
+    renderUsedBanner(ext);
+    const res = await apiPost('reportUso', usoRecord);
+    if(res.ok) toast("Uso registrado — extintor marcado en ATENCIÓN hasta su recarga.");
+  };
+
+  function closePanel(){
+    $("#scrim").classList.remove('show');
+    $("#panel").classList.remove('show');
+    activeExtId = null;
+  }
+  $("#closePanel").onclick = closePanel;
+  $("#cancelSave").onclick = closePanel;
+  $("#scrim").addEventListener('click', closePanel);
+
+  function switchTab(name){
+    $$('.tab').forEach(t=> t.classList.toggle('active', t.dataset.tab===name));
+    $$('.tabpage').forEach(p=> p.classList.toggle('active', p.id==='tab-'+name));
+    $("#saveActive").style.display = (name==='history') ? 'none' : 'inline-block';
+    $("#saveActive").textContent = name==='annual' ? 'Guardar mantenimiento' : name==='info' ? 'Guardar datos' : 'Guardar inspección';
+  }
+  $$('.tab').forEach(t=> t.onclick = ()=> switchTab(t.dataset.tab));
+
+  function renderChecklist(){
+    const root = $("#checklistItems"); root.innerHTML = "";
+    CHECKLIST_DEFS.forEach(([key,label])=>{
+      const row = document.createElement('div');
+      row.className = "checklist-item";
+      row.dataset.key = key;
+      row.innerHTML = `
+        <div class="ci-label">${label}</div>
+        <div class="seg">
+          <button type="button" class="sel-ok active" data-val="ok">Conforme</button>
+          <button type="button" class="sel-bad" data-val="bad">No conforme</button>
+        </div>`;
+      root.appendChild(row);
+    });
+    $$('#checklistItems .seg button').forEach(btn=>{
+      btn.onclick = ()=>{
+        const seg = btn.parentElement;
+        $$('button', seg).forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+      };
+    });
+  }
+
+  function renderHistory(extId){
+    const root = $("#historyList");
+    const inspections = data.inspections.filter(r=>r.extId===extId).map(r=>({...r,kind:'Inspección mensual'}));
+    const maints = data.maintenance.filter(r=>r.extId===extId).map(r=>({...r,kind:'Mantenimiento anual'}));
+    const all = inspections.concat(maints).sort((a,b)=>b.date.localeCompare(a.date));
+    root.innerHTML = "";
+    if(all.length===0){
+      root.innerHTML = `<div class="hist-empty">Aún no hay registros para este extintor.</div>`;
+      return;
+    }
+    all.forEach(r=>{
+      const div = document.createElement('div');
+      div.className = "hist-item";
+      let issuesHtml = "";
+      if(r.kind==='Inspección mensual' && r.hasIssues){
+        const bad = (r.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label);
+        issuesHtml = `<div class="issues">No conforme: ${bad.join(', ')}</div>`;
+      }
+      div.innerHTML = `
+        <div class="hh"><span>${r.kind} · ${fmtDate(r.date)}</span><span class="who">${escapeHtml(r.inspector||r.tecnico||'')}</span></div>
+        ${issuesHtml}
+        ${r.obs? `<div style="font-size:12px;color:var(--ink-dim);margin-top:4px;">${escapeHtml(r.obs)}</div>`:''}
+      `;
+      root.appendChild(div);
+    });
+  }
+
+  // ---------- signature pads ----------
+  function setupSignaturePads(){
+    ['mSig','aSig'].forEach(id=>{
+      const canvas = document.getElementById(id);
+      if(!canvas) return;
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * ratio;
+      canvas.height = rect.height * ratio;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(ratio, ratio);
+      ctx.strokeStyle = "#EDEBE6";
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      let drawing = false, last = null;
+      sigCanvases[id] = { canvas, ctx, hasDrawn:false };
+
+      function pos(e){
+        const r = canvas.getBoundingClientRect();
+        const t = e.touches ? e.touches[0] : e;
+        return { x: t.clientX - r.left, y: t.clientY - r.top };
+      }
+      function start(e){ e.preventDefault(); drawing = true; last = pos(e); }
+      function move(e){
+        if(!drawing) return; e.preventDefault();
+        const p = pos(e);
+        ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+        last = p; sigCanvases[id].hasDrawn = true;
+      }
+      function end(){ drawing = false; }
+
+      canvas.onmousedown = start; canvas.onmousemove = move;
+      window.addEventListener('mouseup', end);
+      canvas.ontouchstart = start; canvas.ontouchmove = move; canvas.ontouchend = end;
+    });
+  }
+  function clearSig(id){
+    const s = sigCanvases[id];
+    if(s){ s.ctx.clearRect(0,0,s.canvas.width,s.canvas.height); s.hasDrawn = false; }
+  }
+  $("#mSigClear").onclick = ()=> clearSig('mSig');
+  $("#aSigClear").onclick = ()=> clearSig('aSig');
+
+  function sigDataUrl(id){
+    const s = sigCanvases[id];
+    if(!s || !s.hasDrawn) return "";
+    return s.canvas.toDataURL('image/png');
+  }
+
+  // ---------- save actions per tab ----------
+  $("#saveActive").onclick = async ()=>{
+    const active = $$('.tab').find(t=>t.classList.contains('active')).dataset.tab;
+    if(active==='monthly') await saveMonthly();
+    else if(active==='annual') await saveAnnual();
+    else if(active==='info') await saveInfo();
+  };
+
+  async function saveMonthly(){
+    if(!$("#mInspector").value.trim()){ toast("Ingrese el nombre del inspector."); return; }
+    const checklist = $$('#checklistItems .checklist-item').map(row=>{
+      const active = $('.seg button.active', row);
+      return { key: row.dataset.key, label: row.querySelector('.ci-label').textContent, val: active.dataset.val };
+    });
+    const hasIssues = checklist.some(c=>c.val==='bad');
+    const record = {
+      id: uid(), extId: activeExtId, date: $("#mDate").value || todayISO(),
+      inspector: $("#mInspector").value.trim(), checklist, hasIssues,
+      obs: $("#mObs").value.trim(), signature: sigDataUrl('mSig')
+    };
+    data.inspections.push(record);
+    renderAll(); renderHistory(activeExtId);
+    const res = await apiPost('addInspection', record);
+    if(res.ok) toast(hasIssues ? "Inspección guardada — se registraron no conformidades." : "Inspección guardada. Extintor conforme.");
+  }
+
+  async function saveAnnual(){
+    if(!$("#aTecnico").value.trim()){ toast("Ingrese el técnico o empresa responsable."); return; }
+    const recarga = $("#aRecarga").value;
+    const record = {
+      id: uid(), extId: activeExtId, date: $("#aDate").value || todayISO(),
+      peso: $("#aPeso").value, tecnico: $("#aTecnico").value.trim(), cert: $("#aCert").value.trim(),
+      recarga, hidro: $("#aHidro").value,
+      proxHidro: $("#aProxHidro").value, proxMant: $("#aProxMant").value,
+      obs: $("#aObs").value.trim(), signature: sigDataUrl('aSig')
+    };
+    data.maintenance.push(record);
+    const ext = data.extinguishers.find(e=>e.id===activeExtId);
+    if(ext && recarga === 'si') ext.usado = false;
+    renderAll(); renderHistory(activeExtId);
+    if(ext) renderUsedBanner(ext);
+    const res = await apiPost('addMaintenance', record);
+    if(res.ok) toast(recarga==='si' ? "Mantenimiento guardado — recarga registrada, alerta de uso liberada." : "Mantenimiento anual guardado.");
+  }
+
+  async function saveInfo(){
+    const ext = data.extinguishers.find(e=>e.id===activeExtId);
+    if(!ext) return;
+    ext.tipo = $("#iTipo").value;
+    ext.capacidad = $("#iCapacidad").value.trim();
+    ext.fabricacion = $("#iFabricacion").value;
+    ext.vencimiento = $("#iVencimiento").value;
+    ext.ubicacion = $("#iUbicacion").value.trim();
+    renderAll();
+    $("#panelTitle").textContent = ext.code;
+    $("#panelMeta").textContent = `${ext.location} · ${ext.area} · ${ext.tipo}`;
+    const res = await apiPost('updateExt', {
+      id: ext.id, tipo: ext.tipo, capacidad: ext.capacidad,
+      fabricacion: ext.fabricacion, vencimiento: ext.vencimiento, ubicacion: ext.ubicacion
+    });
+    if(res.ok) toast("Datos del extintor actualizados.");
+  }
+
+  $("#deleteExt").onclick = async ()=>{
+    if(!activeExtId) return;
+    if(!confirm("¿Eliminar este extintor y todo su historial? Esta acción no se puede deshacer.")) return;
+    const idToDelete = activeExtId;
+    data.extinguishers = data.extinguishers.filter(e=>e.id!==idToDelete);
+    data.inspections = data.inspections.filter(r=>r.extId!==idToDelete);
+    data.maintenance = data.maintenance.filter(r=>r.extId!==idToDelete);
+    data.usageReports = (data.usageReports||[]).filter(r=>r.extId!==idToDelete);
+    closePanel();
+    renderAll();
+    const res = await apiPost('deleteExt', { id: idToDelete });
+    if(res.ok) toast("Extintor eliminado.");
+  };
+
+  // ---------- init ----------
+  (async function init(){
+    await loadData();
+    renderAll();
+  })();
+})();
+</script>
+</body>
+</html>
