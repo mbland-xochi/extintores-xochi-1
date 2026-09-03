@@ -82,6 +82,12 @@
   .alertbar strong{color:#fff;}
   .alertbar .line{margin-bottom:4px;}
   .alertbar .line:last-child{margin-bottom:0;}
+  .pendingbar{
+    display:none;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:var(--radius);padding:10px 16px;margin-bottom:20px;
+    font-size:12.5px;color:var(--ink-dim);
+  }
+  .pendingbar.show{display:block;}
 
   /* ---------- Area layout ---------- */
   .areas{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
@@ -239,6 +245,7 @@
   </header>
 
   <div class="alertbar" id="alertBar"></div>
+  <div class="pendingbar" id="pendingBar"></div>
 
   <div id="areasRoot" class="loading">Conectando con la base de datos…</div>
 
@@ -545,11 +552,8 @@
 
     const insp = lastInspection(ext.id);
     if(insp && insp.hasIssues) bump('bad', 'No conformidad en última inspección mensual');
-    if(!insp || monthKey(insp.date) !== thisMonth){
-      if(level === 'ok') level = 'warn2';
-      reasons.push('Sin inspección registrada este mes');
-    }
-    return { level, reasons };
+    const inspectionMissing = !insp || monthKey(insp.date) !== thisMonth;
+    return { level, reasons, inspectionMissing };
   }
 
   // ---------- rendering ----------
@@ -575,17 +579,28 @@
     const badList = statuses.filter(x=>x.s.level==='bad' && !x.ext.usado);
     const warn1List = statuses.filter(x=>x.s.level==='warn1');
     const warn2List = statuses.filter(x=>x.s.level==='warn2');
+    const pendingInspList = statuses.filter(x=>x.s.inspectionMissing);
 
-    if(!usadoList.length && !badList.length && !warn1List.length && !warn2List.length){
-      bar.classList.remove('show'); return;
+    const hasUrgent = usadoList.length || badList.length || warn1List.length || warn2List.length;
+    if(hasUrgent){
+      const lines = [];
+      if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como usado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
+      if(badList.length) lines.push(`<div class="line"><strong>${badList.length}</strong> con fecha vencida o no conformidad sin resolver.</div>`);
+      if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
+      if(warn2List.length) lines.push(`<div class="line"><strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
+      bar.innerHTML = lines.join('');
+      bar.classList.add('show');
+    } else {
+      bar.classList.remove('show');
     }
-    const lines = [];
-    if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como usado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
-    if(badList.length) lines.push(`<div class="line"><strong>${badList.length}</strong> con fecha vencida o no conformidad sin resolver.</div>`);
-    if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
-    if(warn2List.length) lines.push(`<div class="line"><strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
-    bar.innerHTML = lines.join('');
-    bar.classList.add('show');
+
+    const pendingBar = $("#pendingBar");
+    if(pendingInspList.length){
+      pendingBar.innerHTML = `${pendingInspList.length} extintor${pendingInspList.length>1?'es':''} sin inspección mensual registrada este mes.`;
+      pendingBar.classList.add('show');
+    } else {
+      pendingBar.classList.remove('show');
+    }
   }
 
   function renderAreas(){
@@ -618,6 +633,7 @@
             </div>
             <div class="ext-meta">${ext.ubicacion ? escapeHtml(ext.ubicacion)+' · ' : ''}Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
             ${status.reasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(status.reasons[0])}</div>` : ''}
+            ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección mensual pendiente</div>` : ''}
           `;
           card.onclick = ()=> openPanel(ext.id);
           wrap.appendChild(card);
