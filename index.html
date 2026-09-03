@@ -238,10 +238,6 @@
     <div class="route-strip" id="routeStrip"></div>
   </header>
 
-  <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-    <button class="btn ghost" id="seedDefaults" style="font-size:12.5px;padding:7px 13px;">Cargar extintores por defecto</button>
-  </div>
-
   <div class="alertbar" id="alertBar"></div>
 
   <div id="areasRoot" class="loading">Conectando con la base de datos…</div>
@@ -379,30 +375,48 @@
   const AREAS = ["Oficinas","Garitas","Generador"];
 
   // ===== EXTINTORES POR DEFECTO =====
-  // Plantilla de arranque: un extintor por ubicación/área, con tipo y capacidad sugeridos
-  // según NFPA 10 (Oficinas: PQS 10 lb · Garitas: PQS 5-9 lb · Generador: PQS 20 lb por
-  // riesgo Clase B/C). Edite código, capacidad o tipo aquí si su lista real difiere, o
-  // simplemente cárguelos y corrija cada uno desde la pestaña "Datos" del panel.
-  const DEFAULT_EXTINGUISHERS = [];
-  (function buildDefaults(){
-    const AREA_ABBR = { "Oficinas":"OF", "Garitas":"GA", "Generador":"GE" };
-    const AREA_SPEC = {
-      "Oficinas": { tipo:"PQS", capacidad:"10 lb" },
-      "Garitas": { tipo:"PQS", capacidad:"5 lb" },
-      "Generador": { tipo:"PQS", capacidad:"20 lb" }
-    };
-    ["KM145","KM152","KM162","KM170"].forEach(loc=>{
-      ["Oficinas","Garitas","Generador"].forEach(area=>{
-        const spec = AREA_SPEC[area];
-        DEFAULT_EXTINGUISHERS.push({
-          location: loc, area: area,
-          code: `EXT-${loc}-${AREA_ABBR[area]}-01`,
-          tipo: spec.tipo, capacidad: spec.capacidad,
-          vencimiento: "", ubicacion: ""
-        });
-      });
-    });
-  })();
+  // Inventario real de Xochi. Se carga automáticamente una sola vez, la primera vez
+  // que la base de datos (Google Sheet) está vacía. Después de esa primera carga,
+  // el registro vive en el Sheet y se puede editar o ampliar libremente desde la app.
+  const V27 = "2027-04-08"; // 8/04/27
+  const DEFAULT_EXTINGUISHERS = [
+    // KM145
+    { location:"KM145", area:"Oficinas",  code:"EXT-145-OF-01",  tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Pasillo hacia cocina" },
+    { location:"KM145", area:"Oficinas",  code:"EXT-145-OF-02",  tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Preliquidación" },
+    { location:"KM145", area:"Oficinas",  code:"EXT-145-OF-03",  tipo:"CO2", capacidad:"15 lbs",  vencimiento:V27, ubicacion:"Data Center" },
+    { location:"KM145", area:"Generador", code:"EXT-145-GEN-01", tipo:"PQS", capacidad:"150 lbs", vencimiento:V27, ubicacion:"Generador" },
+    { location:"KM145", area:"Generador", code:"EXT-145-GEN-02", tipo:"PQS", capacidad:"150 lbs", vencimiento:V27, ubicacion:"Móvil" },
+    { location:"KM145", area:"Garitas",   code:"EXT-145-GAR-01", tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Garita #1" },
+    { location:"KM145", area:"Garitas",   code:"EXT-145-GAR-02", tipo:"PQS", capacidad:"10 lbs",  vencimiento:V27, ubicacion:"Garita #2" },
+    { location:"KM145", area:"Garitas",   code:"EXT-145-GAR-03", tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Garita #3" },
+    { location:"KM145", area:"Garitas",   code:"EXT-145-GAR-04", tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Garita #4" },
+    // KM152
+    { location:"KM152", area:"Oficinas",  code:"EXT-152-OF-01",  tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Cocina" },
+    { location:"KM152", area:"Oficinas",  code:"EXT-152-OF-02",  tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Preliquidación" },
+    { location:"KM152", area:"Oficinas",  code:"EXT-152-OF-03",  tipo:"CO2", capacidad:"15 lbs",  vencimiento:V27, ubicacion:"Data Center" },
+    { location:"KM152", area:"Generador", code:"EXT-152-GEN-01", tipo:"PQS", capacidad:"150 lbs", vencimiento:V27, ubicacion:"Generador" },
+    { location:"KM152", area:"Generador", code:"EXT-152-GEN-02", tipo:"PQS", capacidad:"150 lbs", vencimiento:V27, ubicacion:"Móvil" },
+    { location:"KM152", area:"Garitas",   code:"EXT-152-GAR-01", tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Garita #1" },
+    { location:"KM152", area:"Garitas",   code:"EXT-152-GAR-02", tipo:"PQS", capacidad:"10 lbs",  vencimiento:V27, ubicacion:"Garita #2" },
+    { location:"KM152", area:"Garitas",   code:"EXT-152-GAR-03", tipo:"PQS", capacidad:"10 lbs",  vencimiento:V27, ubicacion:"Garita #3" },
+    // KM162
+    { location:"KM162", area:"Oficinas",  code:"EXT-162-OF-01",  tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Cocina" },
+    { location:"KM162", area:"Oficinas",  code:"EXT-162-OF-02",  tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Preliquidación" },
+    { location:"KM162", area:"Oficinas",  code:"EXT-162-OF-03",  tipo:"CO2", capacidad:"15 lbs",  vencimiento:V27, ubicacion:"Data Center" },
+    { location:"KM162", area:"Generador", code:"EXT-162-GEN-01", tipo:"PQS", capacidad:"150 lbs", vencimiento:V27, ubicacion:"Generador" },
+    { location:"KM162", area:"Generador", code:"EXT-162-GEN-02", tipo:"PQS", capacidad:"150 lbs", vencimiento:V27, ubicacion:"Móvil" },
+    { location:"KM162", area:"Garitas",   code:"EXT-162-GAR-01", tipo:"PQS", capacidad:"10 lbs",  vencimiento:V27, ubicacion:"Garita #1" },
+    // KM170
+    { location:"KM170", area:"Oficinas",  code:"EXT-170-OF-01",  tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Pasillo hacia cocina" },
+    { location:"KM170", area:"Oficinas",  code:"EXT-170-OF-02",  tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Preliquidación" },
+    { location:"KM170", area:"Oficinas",  code:"EXT-170-OF-03",  tipo:"CO2", capacidad:"15 lbs",  vencimiento:V27, ubicacion:"Data Center" },
+    { location:"KM170", area:"Generador", code:"EXT-170-GEN-01", tipo:"PQS", capacidad:"150 lbs", vencimiento:V27, ubicacion:"Generador" },
+    { location:"KM170", area:"Generador", code:"EXT-170-GEN-02", tipo:"PQS", capacidad:"150 lbs", vencimiento:V27, ubicacion:"Móvil" },
+    { location:"KM170", area:"Garitas",   code:"EXT-170-GAR-01", tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Garita #1" },
+    { location:"KM170", area:"Garitas",   code:"EXT-170-GAR-02", tipo:"PQS", capacidad:"10 lbs",  vencimiento:V27, ubicacion:"Garita #2" },
+    { location:"KM170", area:"Garitas",   code:"EXT-170-GAR-03", tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Garita #3" },
+    { location:"KM170", area:"Garitas",   code:"EXT-170-GAR-04", tipo:"PQS", capacidad:"5 lbs",   vencimiento:V27, ubicacion:"Garita #4" }
+  ];
 
   const CHECKLIST_DEFS = [
     ["visible","Extintor en su ubicación designada y visible"],
@@ -614,24 +628,6 @@
     renderAlertBar();
     renderAreas();
   }
-
-  $("#seedDefaults").onclick = async ()=>{
-    const missing = DEFAULT_EXTINGUISHERS.filter(def =>
-      !data.extinguishers.some(e => e.location===def.location && e.area===def.area)
-    );
-    if(missing.length === 0){
-      toast("Ya existe al menos un extintor en cada ubicación/área.");
-      return;
-    }
-    if(!confirm(`Se agregarán ${missing.length} extintores base (uno por ubicación/área sin registrar aún). Podrá editar código, capacidad y vencimiento de cada uno después. ¿Continuar?`)) return;
-    for(const def of missing){
-      const ext = { id: uid(), usado:false, fabricacion:"", ...def };
-      data.extinguishers.push(ext);
-      await apiPost('addExt', ext);
-    }
-    renderAll();
-    toast(`${missing.length} extintores base agregados. Edite cada uno para poner el código real y la fecha de vencimiento.`);
-  };
 
   // ---------- add extinguisher modal ----------
   function openAddModal(area){
@@ -947,8 +943,20 @@
   };
 
   // ---------- init ----------
+  async function seedIfEmpty(){
+    if(data.extinguishers.length > 0) return;
+    $("#areasRoot").textContent = "Cargando inventario inicial de extintores…";
+    for(const def of DEFAULT_EXTINGUISHERS){
+      const ext = { id: uid(), usado:false, fabricacion:"", ...def };
+      data.extinguishers.push(ext);
+      await apiPost('addExt', ext);
+    }
+    toast(`Inventario inicial cargado: ${DEFAULT_EXTINGUISHERS.length} extintores.`);
+  }
+
   (async function init(){
     await loadData();
+    await seedIfEmpty();
     renderAll();
   })();
 })();
