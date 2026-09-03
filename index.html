@@ -321,7 +321,7 @@
       </div>
       <div class="row2">
         <div class="field"><label>Fecha de fabricación</label><input type="date" id="iFabricacion"></div>
-        <div class="field"><label>Vencimiento de recarga</label><input type="date" id="iVencimiento"></div>
+        <div class="field"><label>Vencimiento de recarga (ciclo anual)</label><input type="date" id="iVencimiento"></div>
       </div>
       <div class="field"><label>Ubicación física exacta</label><input type="text" id="iUbicacion" placeholder="ej. pasillo de garita, junto a puerta principal"></div>
       <button class="btn ghost" id="deleteExt" style="width:100%;margin-top:6px;color:#F3B0AC;border-color:#5C2822;">Eliminar este extintor</button>
@@ -344,7 +344,7 @@
       </div>
       <div class="field"><label>Capacidad</label><input type="text" id="newCapacidad" placeholder="ej. 10 lb"></div>
     </div>
-    <div class="field"><label>Vencimiento de recarga</label><input type="date" id="newVencimiento"></div>
+    <div class="field"><label>Vencimiento de recarga (ciclo anual)</label><input type="date" id="newVencimiento"></div>
     <div class="field"><label>Ubicación de instalación</label><input type="text" id="newUbicacion" placeholder="ej. pasillo de garita, junto a puerta principal"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px;">
       <button class="btn ghost" id="cancelAdd">Cancelar</button>
@@ -444,6 +444,17 @@
   const uid = () => Math.random().toString(36).slice(2,10);
   const todayISO = () => new Date().toISOString().slice(0,10);
   const fmtDate = (iso) => { if(!iso) return "—"; const d=new Date(iso+"T00:00:00"); return d.toLocaleDateString('es-GT',{day:'2-digit',month:'short',year:'numeric'}); };
+
+  // Los extintores de Xochi se recargan cada 1 año. Al registrar una recarga en el
+  // mantenimiento anual, el sistema calcula y guarda automáticamente el próximo
+  // vencimiento (fecha de recarga + este valor), para que las alertas de 2/1 mes
+  // sigan funcionando sin que alguien tenga que volver a escribir la fecha a mano.
+  const RECHARGE_CYCLE_YEARS = 1;
+  function addYearsISO(dateStr, years){
+    const d = new Date((dateStr || todayISO()) + "T00:00:00");
+    d.setFullYear(d.getFullYear() + years);
+    return d.toISOString().slice(0,10);
+  }
 
   function toast(msg){
     const t = $("#toast"); t.textContent = msg; t.classList.add('show');
@@ -894,8 +905,9 @@
   async function saveAnnual(){
     if(!$("#aTecnico").value.trim()){ toast("Ingrese el técnico o empresa responsable."); return; }
     const recarga = $("#aRecarga").value;
+    const maintDate = $("#aDate").value || todayISO();
     const record = {
-      id: uid(), extId: activeExtId, date: $("#aDate").value || todayISO(),
+      id: uid(), extId: activeExtId, date: maintDate,
       peso: $("#aPeso").value, tecnico: $("#aTecnico").value.trim(), cert: $("#aCert").value.trim(),
       recarga, hidro: $("#aHidro").value,
       proxHidro: $("#aProxHidro").value, proxMant: $("#aProxMant").value,
@@ -903,11 +915,26 @@
     };
     data.maintenance.push(record);
     const ext = data.extinguishers.find(e=>e.id===activeExtId);
-    if(ext && recarga === 'si') ext.usado = false;
+    let nuevoVencimiento = null;
+    if(ext && recarga === 'si'){
+      ext.usado = false;
+      nuevoVencimiento = addYearsISO(maintDate, RECHARGE_CYCLE_YEARS);
+      ext.vencimiento = nuevoVencimiento;
+    }
     renderAll(); renderHistory(activeExtId);
     if(ext) renderUsedBanner(ext);
     const res = await apiPost('addMaintenance', record);
-    if(res.ok) toast(recarga==='si' ? "Mantenimiento guardado — recarga registrada, alerta de uso liberada." : "Mantenimiento anual guardado.");
+    if(nuevoVencimiento){
+      await apiPost('updateExt', {
+        id: ext.id, tipo: ext.tipo, capacidad: ext.capacidad,
+        fabricacion: ext.fabricacion, vencimiento: nuevoVencimiento, ubicacion: ext.ubicacion
+      });
+    }
+    if(res.ok){
+      toast(recarga==='si'
+        ? `Mantenimiento guardado — recarga registrada, próximo vencimiento: ${fmtDate(nuevoVencimiento)}.`
+        : "Mantenimiento anual guardado.");
+    }
   }
 
   async function saveInfo(){
