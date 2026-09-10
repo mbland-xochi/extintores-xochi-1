@@ -239,7 +239,7 @@
   <header class="top">
     <div class="title-block">
       <h1>Extintores <span>·</span> Xochi</h1>
-      <div class="sub">CA-2 KM142–KM173 · Inspección mensual y mantenimiento anual</div>
+      <div class="sub">CA-2 KM142–KM173 · Inspección de 15 días y mantenimiento anual</div>
     </div>
     <div class="route-strip" id="routeStrip"></div>
   </header>
@@ -249,7 +249,7 @@
 
   <div id="areasRoot" class="loading">Conectando con la base de datos…</div>
 
-  <div class="footnote">Checklist mensual basado en criterios de inspección visual NFPA 10.<br>Los datos se guardan compartidos para todo el equipo Xochi.</div>
+  <div class="footnote">Checklist de inspección quincenal (cada 15 días) basado en criterios de inspección visual NFPA 10.<br>Los datos se guardan compartidos para todo el equipo Xochi.</div>
 </div>
 
 <!-- Slide-over detail panel -->
@@ -268,7 +268,7 @@
   <div class="panel-body">
     <div id="usedBanner"></div>
     <div class="tabs">
-      <div class="tab active" data-tab="monthly">Inspección mensual</div>
+      <div class="tab active" data-tab="monthly">Inspección de 15 días</div>
       <div class="tab" data-tab="annual">Mantenimiento anual</div>
       <div class="tab" data-tab="history">Historial</div>
       <div class="tab" data-tab="info">Datos</div>
@@ -510,17 +510,17 @@
   }
   const LEVEL_ORDER = {ok:0, warn2:1, warn1:2, bad:3};
   const LEVEL_LABEL = {ok:"AL DÍA", warn2:"VENCE EN 2 MESES", warn1:"VENCE EN 1 MES", bad:"ATENCIÓN"};
+  const INSPECTION_CYCLE_DAYS = 15;
 
-  // Returns {level, reasons[]}. level is the worst of: ok < warn2 (≤60d) < warn1 (≤30d) < bad (overdue / non-conforming / used).
+  // Returns {level, reasons[{level,text}], inspectionMissing}. level is the worst of:
+  // ok < warn2 (≤60d) < warn1 (≤30d) < bad (overdue / non-conforming / used).
   function extStatus(ext){
     const now = new Date();
-    const monthKey = (d)=> d.slice(0,7);
-    const thisMonth = monthKey(todayISO());
     let level = "ok";
     const reasons = [];
     function bump(newLevel, reason){
       if(LEVEL_ORDER[newLevel] > LEVEL_ORDER[level]) level = newLevel;
-      reasons.push(reason);
+      reasons.push({ level: newLevel, text: reason });
     }
     function checkDate(dateStr, vencidoMsg, m1Msg, m2Msg){
       if(!dateStr) return;
@@ -531,29 +531,35 @@
     }
 
     if(ext.usado){
-      bump('bad', 'Reportado como usado — requiere recarga inmediata');
+      bump('bad', 'Uso reportado — requiere recarga inmediata');
     }
     checkDate(ext.vencimiento,
-      'Vencimiento de recarga vencido',
-      'Vencimiento de recarga en menos de 1 mes',
-      'Vencimiento de recarga en menos de 2 meses');
+      'Vencimiento de recarga: fecha vencida',
+      'Vencimiento de recarga: vence en menos de 1 mes',
+      'Vencimiento de recarga: vence en menos de 2 meses');
 
     const maint = lastMaintenance(ext.id);
     if(maint){
       checkDate(maint.proxHidro,
-        'Prueba hidrostática vencida',
-        'Prueba hidrostática vence en menos de 1 mes',
-        'Prueba hidrostática vence en menos de 2 meses');
+        'Vencimiento de prueba hidrostática: fecha vencida',
+        'Vencimiento de prueba hidrostática: vence en menos de 1 mes',
+        'Vencimiento de prueba hidrostática: vence en menos de 2 meses');
       checkDate(maint.proxMant,
-        'Mantenimiento anual vencido',
-        'Mantenimiento anual vence en menos de 1 mes',
-        'Mantenimiento anual vence en menos de 2 meses');
+        'Vencimiento de mantenimiento anual: fecha vencida',
+        'Vencimiento de mantenimiento anual: vence en menos de 1 mes',
+        'Vencimiento de mantenimiento anual: vence en menos de 2 meses');
     }
 
     const insp = lastInspection(ext.id);
-    if(insp && insp.hasIssues) bump('bad', 'No conformidad en última inspección mensual');
-    const inspectionMissing = !insp || monthKey(insp.date) !== thisMonth;
-    return { level, reasons, inspectionMissing };
+    if(insp && insp.hasIssues) bump('bad', 'No conformidad en última inspección de 15 días');
+
+    const daysSinceInsp = insp ? Math.floor((now - new Date(insp.date+"T00:00:00"))/DAY) : Infinity;
+    const inspectionMissing = daysSinceInsp > INSPECTION_CYCLE_DAYS;
+
+    // Solo se muestran los motivos que corresponden a la gravedad final (evita mostrar
+    // un motivo leve cuando el estado real del extintor es más grave por otra causa).
+    const topReasons = reasons.filter(r => r.level === level).map(r => r.text);
+    return { level, reasons: topReasons, inspectionMissing };
   }
 
   // ---------- rendering ----------
@@ -596,7 +602,7 @@
 
     const pendingBar = $("#pendingBar");
     if(pendingInspList.length){
-      pendingBar.innerHTML = `${pendingInspList.length} extintor${pendingInspList.length>1?'es':''} sin inspección mensual registrada este mes.`;
+      pendingBar.innerHTML = `${pendingInspList.length} extintor${pendingInspList.length>1?'es':''} sin inspección de 15 días registrada en el período vigente.`;
       pendingBar.classList.add('show');
     } else {
       pendingBar.classList.remove('show');
@@ -607,8 +613,18 @@
     const root = $("#areasRoot");
     root.className = "areas";
     root.innerHTML = "";
-    AREAS.forEach(area=>{
+
+    // Ordena las secciones (Oficinas/Garitas/Generador) para que la que tenga la alerta
+    // más grave aparezca primero, sin importar el orden habitual de las áreas.
+    const areaBlocks = AREAS.map(area=>{
       const exts = data.extinguishers.filter(e=>e.location===activeLocation && e.area===area);
+      let worst = "ok";
+      exts.forEach(e=>{ const lvl = extStatus(e).level; if(LEVEL_ORDER[lvl] > LEVEL_ORDER[worst]) worst = lvl; });
+      return { area, exts, worst };
+    });
+    areaBlocks.sort((a,b) => LEVEL_ORDER[b.worst] - LEVEL_ORDER[a.worst]);
+
+    areaBlocks.forEach(({area, exts})=>{
       const wrap = document.createElement('div');
       wrap.className = "area";
       wrap.innerHTML = `<div class="area-head"><h2>${area}</h2><span class="area-count">${exts.length}</span></div>`;
@@ -632,8 +648,8 @@
               <span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>
             </div>
             <div class="ext-meta">${ext.ubicacion ? escapeHtml(ext.ubicacion)+' · ' : ''}Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
-            ${status.reasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(status.reasons[0])}</div>` : ''}
-            ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección mensual pendiente</div>` : ''}
+            ${status.reasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(status.reasons.join('; '))}</div>` : ''}
+            ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección de 15 días pendiente</div>` : ''}
           `;
           card.onclick = ()=> openPanel(ext.id);
           wrap.appendChild(card);
@@ -818,7 +834,7 @@
 
   function renderHistory(extId){
     const root = $("#historyList");
-    const inspections = data.inspections.filter(r=>r.extId===extId).map(r=>({...r,kind:'Inspección mensual'}));
+    const inspections = data.inspections.filter(r=>r.extId===extId).map(r=>({...r,kind:'Inspección de 15 días'}));
     const maints = data.maintenance.filter(r=>r.extId===extId).map(r=>({...r,kind:'Mantenimiento anual'}));
     const all = inspections.concat(maints).sort((a,b)=>b.date.localeCompare(a.date));
     root.innerHTML = "";
@@ -830,7 +846,7 @@
       const div = document.createElement('div');
       div.className = "hist-item";
       let issuesHtml = "";
-      if(r.kind==='Inspección mensual' && r.hasIssues){
+      if(r.kind==='Inspección de 15 días' && r.hasIssues){
         const bad = (r.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label);
         issuesHtml = `<div class="issues">No conforme: ${bad.join(', ')}</div>`;
       }
@@ -914,8 +930,9 @@
     };
     data.inspections.push(record);
     renderAll(); renderHistory(activeExtId);
+    toast(hasIssues ? "Inspección guardada — se registraron no conformidades." : "Inspección guardada.");
     const res = await apiPost('addInspection', record);
-    if(res.ok) toast(hasIssues ? "Inspección guardada — se registraron no conformidades." : "Inspección guardada. Extintor conforme.");
+    if(!res.ok) toast("No se pudo sincronizar la inspección con la base de datos.");
   }
 
   async function saveAnnual(){
