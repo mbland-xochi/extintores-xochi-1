@@ -583,6 +583,8 @@
     const statuses = data.extinguishers.map(e=>({ext:e, s:extStatus(e)}));
     const usadoList = statuses.filter(x=>x.ext.usado);
     const badList = statuses.filter(x=>x.s.level==='bad' && !x.ext.usado);
+    const noConformidadList = badList.filter(x=>x.s.reasons.some(r=>r.includes('No conformidad')));
+    const fechaVencidaList = badList.filter(x=>x.s.reasons.some(r=>r.includes('fecha vencida')));
     const warn1List = statuses.filter(x=>x.s.level==='warn1');
     const warn2List = statuses.filter(x=>x.s.level==='warn2');
     const pendingInspList = statuses.filter(x=>x.s.inspectionMissing);
@@ -591,7 +593,8 @@
     if(hasUrgent){
       const lines = [];
       if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como usado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
-      if(badList.length) lines.push(`<div class="line"><strong>${badList.length}</strong> con fecha vencida o no conformidad sin resolver.</div>`);
+      if(noConformidadList.length) lines.push(`<div class="line"><strong>${noConformidadList.length}</strong> con no conformidad sin resolver de su última inspección de 15 días.</div>`);
+      if(fechaVencidaList.length) lines.push(`<div class="line"><strong>${fechaVencidaList.length}</strong> con fecha vencida (recarga, prueba hidrostática o mantenimiento anual).</div>`);
       if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
       if(warn2List.length) lines.push(`<div class="line"><strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
       bar.innerHTML = lines.join('');
