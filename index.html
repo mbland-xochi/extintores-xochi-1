@@ -88,6 +88,20 @@
     font-size:12.5px;color:var(--ink-dim);
   }
   .pendingbar.show{display:block;}
+  .rounds{display:none;margin-bottom:20px;}
+  .rounds.show{display:block;}
+  .rounds h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin:0 0 8px;font-weight:500;}
+  .round-row{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:8px;cursor:pointer;}
+  .round-row.active{border-color:var(--ink-faint);}
+  .round-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;}
+  .round-top .km-name{font-family:'Oswald',system-ui,sans-serif;font-size:15px;letter-spacing:.04em;}
+  .round-top .count{color:var(--ink-dim);font-size:12.5px;}
+  .round-bar{height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:8px;}
+  .round-bar > span{display:block;height:100%;background:var(--amber);border-radius:99px;transition:width .3s;}
+  .round-row.complete .round-bar > span{background:var(--green);}
+  .round-row.complete .count{color:var(--green);}
+  .round-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;font-size:11.5px;color:var(--ink-faint);}
+  .round-foot .btn{padding:5px 10px;font-size:12px;}
 
   /* navegación entre vistas */
   .viewnav{display:flex;gap:8px;margin-bottom:18px;}
@@ -126,6 +140,17 @@
   .nc-list{margin:0;padding-left:16px;font-size:12.5px;font-weight:700;color:#fff;line-height:1.5;}
   .nc-obs{margin-top:6px;font-size:12px;color:#F3C9C6;}
   #ncBanner .nc-box{margin:0 0 14px;}
+
+  /* reporte PDF */
+  .pdf-panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:18px;}
+  .pdf-title{font-size:15px;font-weight:600;margin:0 0 12px;}
+  .pdf-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+  .pdf-controls label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--ink-dim);font-weight:500;}
+  .pdf-controls select{background:var(--surface-3);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:9px 10px;font-size:14px;font-family:inherit;min-width:130px;}
+  .pdf-controls select:focus{outline:2px solid var(--focus);outline-offset:0;border-color:transparent;}
+  .chk{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-dim);margin-top:2px;cursor:pointer;}
+  .chk input{width:18px;height:18px;accent-color:var(--red);flex-shrink:0;}
+  .hist-pdf{margin-top:8px;padding:5px 11px;font-size:12px;}
 
   /* observaciones siempre en negrita */
   .obs{font-weight:700;color:var(--ink);}
@@ -282,7 +307,7 @@
   <header class="top">
     <div class="title-block">
       <h1>Extintores <span>·</span> Xochi</h1>
-      <div class="sub">CA-2 KM142–KM173 · Inspección de 15 días y mantenimiento anual</div>
+      <div class="sub">CA-2 KM142–KM173 · Inspección mensual y mantenimiento anual</div>
     </div>
     <div class="route-strip" id="routeStrip"></div>
   </header>
@@ -294,12 +319,13 @@
 
   <div class="alertbar" id="alertBar"></div>
   <div class="pendingbar" id="pendingBar"></div>
+  <div class="rounds" id="roundsRoot"></div>
 
   <div id="areasRoot" class="loading">Conectando con la base de datos…</div>
   <div id="reporteRoot" style="display:none;"></div>
   <datalist id="peopleNames"></datalist>
 
-  <div class="footnote">Checklist de inspección quincenal (cada 15 días) basado en criterios de inspección visual NFPA 10.<br>Los datos se guardan compartidos para todo el equipo Xochi.</div>
+  <div class="footnote">Checklist de inspección mensual basado en criterios de inspección visual NFPA 10.<br>Los datos se guardan compartidos para todo el equipo Xochi.</div>
 </div>
 
 <!-- Slide-over detail panel -->
@@ -319,7 +345,7 @@
     <div id="usedBanner"></div>
     <div id="ncBanner"></div>
     <div class="tabs">
-      <div class="tab active" data-tab="monthly">Inspección de 15 días</div>
+      <div class="tab active" data-tab="monthly">Inspección mensual</div>
       <div class="tab" data-tab="annual">Mantenimiento anual</div>
       <div class="tab" data-tab="history">Historial</div>
       <div class="tab" data-tab="info">Datos</div>
@@ -335,6 +361,7 @@
         <div class="sig-wrap"><canvas class="sig" id="mSig"></canvas></div>
         <div class="sig-actions"><span>Dibuje con el dedo o el mouse</span><button class="btn ghost" id="mSigClear" style="padding:4px 10px;font-size:11px;">Limpiar</button></div>
       </div>
+      <label class="chk"><input type="checkbox" id="autoPdf"> Descargar automáticamente el informe del KM al completar su inspección</label>
     </div>
 
     <div class="tabpage" id="tab-annual">
@@ -565,6 +592,11 @@
     list.forEach(r=>{ if(!best || r.date >= best.date) best = r; });
     return best;
   }
+  // Una inspección "vigente" tiene menos de 30 días: se vence a los 30 días exactos de su fecha.
+  const INSPECTION_DAYS = 30;
+  function isCurrentInspection(insp){
+    return !!insp && dateOnly(insp.date) > shiftISO(todayISO(), -INSPECTION_DAYS);
+  }
   function lastInspection(extId){ return latestByDate(data.inspections.filter(r=>r.extId===extId)); }
   function lastMaintenance(extId){ return latestByDate(data.maintenance.filter(r=>r.extId===extId)); }
 
@@ -577,7 +609,6 @@
 
   const LEVEL_ORDER = {ok:0, warn2:1, warn1:2, bad:3};
   const LEVEL_LABEL = {ok:"AL DÍA", warn2:"VENCE EN 2 MESES", warn1:"VENCE EN 1 MES", bad:"ATENCIÓN"};
-  const INSPECTION_CYCLE_DAYS = 15;
 
   // Returns {level, reasons[{level,text}], inspectionMissing}. level is the worst of:
   // ok < warn2 (≤60d) < warn1 (≤30d) < bad (overdue / non-conforming / used).
@@ -620,12 +651,12 @@
     const insp = lastInspection(ext.id);
     let ncItems = [];
     if(insp && insp.hasIssues){
-      bump('bad', 'No conformidad en última inspección de 15 días');
+      bump('bad', 'No conformidad en última inspección mensual');
       ncItems = (insp.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label);
     }
 
-    const daysSinceInsp = insp ? Math.floor((now - new Date(insp.date+"T00:00:00"))/DAY) : Infinity;
-    const inspectionMissing = daysSinceInsp > INSPECTION_CYCLE_DAYS;
+    // Frecuencia mensual: pendiente si la última inspección tiene 30 días o más (o no existe).
+    const inspectionMissing = !insp || !isCurrentInspection(insp);
 
     // Solo se muestran los motivos que corresponden a la gravedad final (evita mostrar
     // un motivo leve cuando el estado real del extintor es más grave por otra causa).
@@ -664,7 +695,7 @@
     if(hasUrgent){
       const lines = [];
       if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como descargado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
-      if(noConformidadList.length) lines.push(`<div class="line"><strong>${noConformidadList.length}</strong> con no conformidad sin resolver de su última inspección de 15 días.</div>`);
+      if(noConformidadList.length) lines.push(`<div class="line"><strong>${noConformidadList.length}</strong> con no conformidad sin resolver de su última inspección.</div>`);
       if(fechaVencidaList.length) lines.push(`<div class="line"><strong>${fechaVencidaList.length}</strong> con fecha vencida (recarga, prueba hidrostática o mantenimiento anual).</div>`);
       if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
       if(warn2List.length) lines.push(`<div class="line"><strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
@@ -676,7 +707,7 @@
 
     const pendingBar = $("#pendingBar");
     if(pendingInspList.length){
-      pendingBar.innerHTML = `${pendingInspList.length} extintor${pendingInspList.length>1?'es':''} sin inspección de 15 días registrada en el período vigente.`;
+      pendingBar.innerHTML = `${pendingInspList.length} extintor${pendingInspList.length>1?'es':''} sin inspección en los últimos 30 días.`;
       pendingBar.classList.add('show');
     } else {
       pendingBar.classList.remove('show');
@@ -710,8 +741,50 @@
       <div class="ext-meta">${ext.ubicacion ? escapeHtml(ext.ubicacion)+' · ' : ''}Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
       ${shownReasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(shownReasons.join('; '))}</div>` : ''}
       ${ncBoxHtml(status)}
-      ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección de 15 días pendiente</div>` : ''}
+      ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección pendiente (cada 30 días)</div>` : ''}
     `;
+  }
+
+  // ---------- rondas de inspección por KM ----------
+  // Una ronda es la inspección de todos los extintores de un KM. Se deriva de los datos compartidos:
+  // un extintor está "al día" si su última inspección tiene menos de 30 días; la ronda del KM está
+  // completa cuando todos sus extintores están al día y en curso cuando solo algunos lo están.
+  function roundInfo(loc){
+    const exts = data.extinguishers.filter(e=>e.location===loc).sort(extOrder);
+    const insps = [];
+    const pending = [];
+    exts.forEach(e=>{
+      const i = lastInspection(e.id);
+      if(isCurrentInspection(i)) insps.push(i); else pending.push(e);
+    });
+    const dates = insps.map(i=>dateOnly(i.date)).sort();
+    return {
+      loc, exts, total: exts.length, done: insps.length, pending, insps,
+      started: insps.length > 0, complete: exts.length > 0 && pending.length === 0,
+      from: dates[0] || '', to: dates[dates.length-1] || ''
+    };
+  }
+
+  function renderRounds(){
+    const root = $("#roundsRoot");
+    const list = LOCATIONS.map(roundInfo).filter(r=>r.started);
+    if(!list.length || activeView !== 'home'){ root.classList.remove('show'); root.innerHTML = ''; return; }
+    root.innerHTML = `<h2>Avance de inspección por KM</h2>` + list.map(r=>{
+      const pct = Math.round(r.done / r.total * 100);
+      return `<div class="round-row${r.complete?' complete':''}${r.loc===activeLocation?' active':''}" data-loc="${r.loc}">
+        <div class="round-top"><span class="km-name">${r.loc}</span>
+          <span class="count">${r.complete ? 'Inspección completa · ' : ''}${r.done} de ${r.total} extintores (${pct}%)</span></div>
+        <div class="round-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${r.total}" aria-valuenow="${r.done}"><span style="width:${pct}%"></span></div>
+        <div class="round-foot"><span>${r.complete ? 'Informe del KM disponible' : `Faltan ${r.pending.length}`}</span>
+          ${r.complete ? `<button type="button" class="btn ghost round-pdf" data-loc="${r.loc}">Descargar informe</button>` : ''}</div>
+      </div>`;
+    }).join('');
+    root.classList.add('show');
+    $$('.round-row', root).forEach(row=> row.onclick = (ev)=>{
+      if(ev.target.closest('.round-pdf')) return;
+      activeLocation = row.dataset.loc; renderAll();
+    });
+    $$('.round-pdf', root).forEach(b=> b.onclick = ()=> runPdf(b, ()=>makeKmRoundPdf(b.dataset.loc)));
   }
 
   function renderAreas(){
@@ -838,7 +911,7 @@
     const hist = [];
     for(let wk = thisWeek; wk >= first && hist.length < 12; wk = shiftISO(wk, -7)) hist.push(wk);
 
-    root.innerHTML = `
+    root.innerHTML = pdfPanelHtml() + `
       <div class="rep-head">
         <div class="rep-week">
           <button class="btn ghost" id="repPrev" type="button">◀</button>
@@ -868,13 +941,14 @@
         <tbody>${hist.map(wk=>`<tr class="clickable ${wk===reportWeek?'sel':''}" data-week="${wk}"><td>${weekLabel(wk)}${wk===thisWeek?' · actual':''}</td><td class="num">${weekPeople(usage,wk).length}</td><td class="num total">${weekTotal(usage,wk)}</td></tr>`).join('')}</tbody>
       </table></div>
 
-      <div class="rep-note">Cuenta los registros guardados con nombre: inspecciones de 15 días (inspector), mantenimientos anuales (técnico) y descargas reportadas (quien reporta). Semana de lunes a domingo, según la fecha del registro. Las diferencias de mayúsculas, tildes o espacios en un nombre se agrupan como la misma persona.</div>`;
+      <div class="rep-note">Cuenta los registros guardados con nombre: inspecciones mensuales (inspector), mantenimientos anuales (técnico) y descargas reportadas (quien reporta). Semana de lunes a domingo, según la fecha del registro. Las diferencias de mayúsculas, tildes o espacios en un nombre se agrupan como la misma persona.</div>`;
 
     $("#repPrev").onclick = ()=>{ reportWeek = shiftISO(reportWeek, -7); renderReporte(); };
     $("#repNext").onclick = ()=>{ if(reportWeek < thisWeek){ reportWeek = shiftISO(reportWeek, 7); renderReporte(); } };
     const now = $("#repNow"); if(now) now.onclick = ()=>{ reportWeek = thisWeek; renderReporte(); };
     $$('#reporteRoot tr.clickable').forEach(tr=> tr.onclick = ()=>{ reportWeek = tr.dataset.week; renderReporte(); });
     $("#repCsv").onclick = ()=> downloadUsageCsv(usage);
+    bindPdfPanel();
   }
 
   function downloadUsageCsv(usage){
@@ -899,6 +973,359 @@
     $("#peopleNames").innerHTML = Object.values(seen).sort().map(n=>`<option value="${escapeHtml(n)}"></option>`).join('');
   }
 
+  // ---------- PDF: reportes de inspección con firmas ----------
+  // La librería jsPDF se carga solo cuando se pide un PDF (así la plataforma no depende de ella para abrir).
+  const PDF_LIB_SOURCES = [
+    { src:"https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js",   integrity:"sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" },
+    { src:"https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", integrity:"sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk" }
+  ];
+  let pdfLibPromise = null;
+  function loadPdfLib(){
+    if(window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+    if(pdfLibPromise) return pdfLibPromise;
+    pdfLibPromise = new Promise((resolve, reject)=>{
+      let i = 0;
+      function next(){
+        if(i >= PDF_LIB_SOURCES.length){ pdfLibPromise = null; reject(new Error("No se pudo cargar el generador de PDF")); return; }
+        const cfg = PDF_LIB_SOURCES[i++];
+        const sc = document.createElement('script');
+        let done = false;
+        const fail = ()=>{ if(done) return; done = true; clearTimeout(timer); sc.remove(); next(); };
+        const timer = setTimeout(fail, 15000);
+        sc.onload = ()=>{ if(done) return; done = true; clearTimeout(timer);
+          if(window.jspdf && window.jspdf.jsPDF) resolve(window.jspdf.jsPDF); else { sc.remove(); next(); } };
+        sc.onerror = fail;
+        sc.integrity = cfg.integrity; sc.crossOrigin = 'anonymous'; sc.src = cfg.src;
+        document.head.appendChild(sc);
+      }
+      next();
+    });
+    return pdfLibPromise;
+  }
+
+  const PG = { M:15, CW:180, TOP:18, BOTTOM:280 };
+  const INK=[33,33,33], MUTED=[105,105,105], RED=[200,40,35], RULE=[205,205,205], SOFT=[242,242,242];
+  const LH = 3.7;
+
+  // Las fuentes estándar del PDF solo admiten Latin-1: se normalizan comillas/guiones y se reemplaza lo demás.
+  function pdfSafe(s){
+    return String(s == null ? "" : s)
+      .replace(/[‘’]/g,"'").replace(/[“”]/g,'"')
+      .replace(/[–—]/g,"-").replace(/…/g,"...").replace(/ /g," ")
+      .replace(/[\r\t]/g," ")
+      .replace(/[^\n\x20-\x7E¡-ÿ]/g,"?");
+  }
+  function fmtDMY(v){ const d = dateOnly(v); if(!d) return "-"; const p = d.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; }
+  function monthLabel(ym){ const p = ym.split('-').map(Number); return new Date(p[0], p[1]-1, 1, 12).toLocaleDateString('es-GT',{month:'long',year:'numeric'}); }
+  function nowStamp(){ const n = new Date(); return `${fmtDMY(todayISO())} ${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; }
+  function safeFile(s){ return String(s||'').replace(/[^A-Za-z0-9_-]+/g,'-'); }
+  function extOrder(a,b){
+    return (LOCATIONS.indexOf(a.location) - LOCATIONS.indexOf(b.location))
+        || (AREAS.indexOf(a.area) - AREAS.indexOf(b.area))
+        || String(a.code||'').localeCompare(String(b.code||''), 'es', {numeric:true});
+  }
+
+  // La firma se guarda en color claro (se dibuja sobre fondo oscuro): para el papel se pasa a tinta oscura sobre blanco.
+  const sigCachePdf = new Map();
+  function loadImg(src){ return new Promise((res,rej)=>{ const im = new Image(); im.onload = ()=>res(im); im.onerror = ()=>rej(new Error('img')); im.src = src; }); }
+  async function signatureForPdf(dataUrl){
+    if(typeof dataUrl !== 'string' || !/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/.test(dataUrl)) return null;
+    if(sigCachePdf.has(dataUrl)) return sigCachePdf.get(dataUrl);
+    try{
+      const im = await loadImg(dataUrl);
+      const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+      if(!w || !h) return null;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(im, 0, 0);
+      const frame = ctx.getImageData(0, 0, w, h), px = frame.data;
+      for(let i = 0; i < px.length; i += 4){
+        const a = px[i+3] / 255;
+        px[i]   = Math.round(255 - (255-20)*a);
+        px[i+1] = Math.round(255 - (255-24)*a);
+        px[i+2] = Math.round(255 - (255-48)*a);
+        px[i+3] = 255;
+      }
+      ctx.putImageData(frame, 0, 0);
+      const out = { url: c.toDataURL('image/jpeg', 0.92), w, h };
+      sigCachePdf.set(dataUrl, out);
+      return out;
+    }catch(e){ console.error(e); return null; }
+  }
+
+  function pdfFont(doc, style, size, color){
+    doc.setFont('helvetica', style); doc.setFontSize(size);
+    const c = color || INK; doc.setTextColor(c[0], c[1], c[2]);
+  }
+  function pdfWrap(doc, text, width){ return doc.splitTextToSize(pdfSafe(text), width); }
+
+  function drawReportHeader(doc, title, subLines){
+    const h = 12 + subLines.length * 4.8;
+    doc.setFillColor(RED[0], RED[1], RED[2]); doc.rect(PG.M, 13, 1.6, h + 4, 'F');
+    pdfFont(doc,'bold',8.5,RED); doc.text('XOCHI AUTOPISTA', PG.M + 4.5, 16.8);
+    pdfFont(doc,'bold',16,INK);  doc.text(pdfSafe(title), PG.M + 4.5, 24.2);
+    pdfFont(doc,'normal',9.5,MUTED);
+    let y = 30.2;
+    subLines.forEach(l=>{ doc.text(pdfSafe(l), PG.M + 4.5, y); y += 4.8; });
+    return y + 5;
+  }
+  function drawFooters(doc, leftText){
+    const n = doc.getNumberOfPages();
+    for(let i = 1; i <= n; i++){
+      doc.setPage(i);
+      doc.setDrawColor(RULE[0], RULE[1], RULE[2]); doc.setLineWidth(0.2);
+      doc.line(PG.M, 287, PG.M + PG.CW, 287);
+      pdfFont(doc,'normal',7.5,MUTED);
+      doc.text(pdfSafe(leftText), PG.M, 291.5);
+      doc.text(`Página ${i} de ${n}`, PG.M + PG.CW, 291.5, {align:'right'});
+    }
+  }
+  function ensureSpace(doc, y, h){ if(y + h > PG.BOTTOM){ doc.addPage(); return PG.TOP; } return y; }
+
+  // Dibuja (o solo mide, con dry=true) el detalle de una inspección. Devuelve la nueva posición vertical.
+  function drawInspectionBlock(doc, y, b, dry){
+    const ext = b.ext, insp = b.insp, sig = b.sig;
+    const M = PG.M, CW = PG.CW;
+    const put = (s, x, yy, o)=>{ if(!dry) doc.text(pdfSafe(s), x, yy, o); };
+    let yy = y;
+
+    if(!dry){ doc.setFillColor(SOFT[0], SOFT[1], SOFT[2]); doc.rect(M, yy, CW, 7.5, 'F'); }
+    pdfFont(doc,'bold',10);              put(ext.code || '(sin código)', M + 2, yy + 5.1);
+    pdfFont(doc,'normal',8.5,MUTED);     put(`${ext.location} | ${ext.area}`, M + CW - 2, yy + 5.1, {align:'right'});
+    yy += 7.5 + 3;
+
+    pdfFont(doc,'normal',8.5,INK);
+    pdfWrap(doc, `Tipo: ${ext.tipo||'-'} ${ext.capacidad||''}   |   Ubicación: ${ext.ubicacion||'-'}   |   Vencimiento de recarga: ${fmtDMY(ext.vencimiento)}`, CW)
+      .forEach(l=>{ put(l, M, yy + 2.8); yy += LH; });
+    pdfFont(doc,'bold',8.5,INK);
+    pdfWrap(doc, `Fecha de inspección: ${fmtDMY(insp.date)}   |   Inspector: ${insp.inspector||'-'}`, CW)
+      .forEach(l=>{ put(l, M, yy + 2.8); yy += LH; });
+    yy += 2;
+
+    const items = insp.checklist || [];
+    pdfFont(doc,'bold',8,MUTED); put('Lista de verificación (OK = conforme, NC = no conforme)', M, yy + 2.6); yy += 5;
+    if(!items.length){
+      pdfFont(doc,'normal',8,MUTED); put('Sin detalle de la lista de verificación.', M, yy + 2.6); yy += 5;
+    } else {
+      const colW = CW / 2;
+      for(let i = 0; i < items.length; i += 2){
+        const cells = [items[i], items[i+1]].filter(Boolean);
+        const wraps = cells.map(c=>{ pdfFont(doc, c.val==='bad' ? 'bold' : 'normal', 7.8, INK); return pdfWrap(doc, c.label || '', colW - 11); });
+        const lines = Math.max.apply(null, wraps.map(w=>w.length));
+        if(!dry){
+          cells.forEach((c, ci)=>{
+            const x = M + ci * colW, bad = c.val === 'bad';
+            pdfFont(doc, bad ? 'bold' : 'normal', 7.8, bad ? RED : MUTED);
+            doc.text(bad ? 'NC' : 'OK', x, yy + 2.6);
+            pdfFont(doc, bad ? 'bold' : 'normal', 7.8, INK);
+            wraps[ci].forEach((ln, li)=> doc.text(ln, x + 9, yy + 2.6 + li * 3.3));
+          });
+        }
+        yy += lines * 3.3 + 1.3;
+      }
+    }
+
+    if(insp.hasIssues){
+      const bad = items.filter(c=>c.val==='bad');
+      yy += 1;
+      pdfFont(doc,'bold',8.5,RED); put('No conformidades por corregir:', M, yy + 2.8); yy += 4.6;
+      if(bad.length){
+        pdfFont(doc,'bold',8.5,INK);
+        bad.forEach(c=>{ pdfWrap(doc, '- ' + (c.label || ''), CW - 4).forEach(ln=>{ put(ln, M + 3, yy + 2.6); yy += LH; }); });
+      } else {
+        pdfFont(doc,'normal',8.5,MUTED); put('Inspección marcada con no conformidad, sin detalle registrado.', M + 3, yy + 2.6); yy += LH;
+      }
+    }
+
+    if(insp.obs){
+      yy += 1.5;
+      pdfFont(doc,'normal',8.5,MUTED); put('Observaciones:', M, yy + 2.8); yy += 4.6;
+      pdfFont(doc,'bold',8.5,INK);
+      pdfWrap(doc, String(insp.obs).slice(0,1500), CW - 4).forEach(ln=>{ put(ln, M + 3, yy + 2.6); yy += LH; });
+    }
+
+    yy += 3;
+    const boxH = 20;
+    if(sig){
+      let w = 50, h = w * sig.h / sig.w;
+      if(h > boxH){ h = boxH; w = h * sig.w / sig.h; }
+      if(!dry) doc.addImage(sig.url, 'JPEG', M + 2, yy + (boxH - h), w, h);
+    } else {
+      pdfFont(doc,'normal',8,MUTED); put('(sin firma registrada)', M + 2, yy + boxH - 4);
+    }
+    yy += boxH;
+    if(!dry){ doc.setDrawColor(120,120,120); doc.setLineWidth(0.25); doc.line(M + 2, yy + 0.6, M + 62, yy + 0.6); }
+    pdfFont(doc,'normal',7.5,MUTED); put(`Firma de ${insp.inspector || 'inspector'}`, M + 2, yy + 4.4);
+    yy += 7;
+    if(!dry){ doc.setDrawColor(RULE[0], RULE[1], RULE[2]); doc.setLineWidth(0.2); doc.line(M, yy + 1, M + CW, yy + 1); }
+    return yy + 5;
+  }
+
+  async function makeInspectionPdf(ext, insp){
+    const jsPDF = await loadPdfLib();
+    const sig = await signatureForPdf(insp.signature);
+    const doc = new jsPDF({unit:'mm', format:'a4'});
+    let y = drawReportHeader(doc, 'Informe de inspección mensual de extintor', [`Fecha de inspección: ${fmtDMY(insp.date)}`]);
+    drawInspectionBlock(doc, y, {ext, insp, sig}, false);
+    drawFooters(doc, `Generado: ${nowStamp()}`);
+    return { doc, filename: `inspeccion-${safeFile(ext.code)}-${dateOnly(insp.date)}.pdf` };
+  }
+
+  async function makePeriodPdf(sel){      // sel = { loc: 'ALL' | 'KM145'..., month: 'YYYY-MM' } o { loc, round }
+    const jsPDF = await loadPdfLib();
+    const locs = sel.loc === 'ALL' ? LOCATIONS : [sel.loc];
+    const exts = data.extinguishers.filter(e=>locs.indexOf(e.location) > -1).sort(extOrder);
+    const byId = {}; exts.forEach(e=>{ byId[e.id] = e; });
+    const insps = (sel.round ? sel.round.insps : data.inspections)
+      .filter(i=> byId[i.extId] && (sel.round || dateOnly(i.date).slice(0,7) === sel.month))
+      .sort((a,b)=> extOrder(byId[a.extId], byId[b.extId]) || dateOnly(a.date).localeCompare(dateOnly(b.date)));
+    const sigs = [];
+    for(const i of insps) sigs.push(await signatureForPdf(i.signature));
+
+    const latest = {};
+    insps.forEach(i=>{ const cur = latest[i.extId]; if(!cur || dateOnly(i.date) >= dateOnly(cur.date)) latest[i.extId] = i; });
+    const rows = locs.map(loc=>{
+      const list = exts.filter(e=>e.location === loc), done = list.filter(e=>latest[e.id]);
+      return { loc, total: list.length, done: done.length, pending: list.length - done.length, nc: done.filter(e=>latest[e.id].hasIssues).length };
+    });
+    const pendingExts = exts.filter(e=>!latest[e.id]);
+
+    const doc = new jsPDF({unit:'mm', format:'a4'});
+    const scopeTxt = sel.round ? 'en esta inspección' : 'en este período';
+    let y = drawReportHeader(doc, sel.round ? `Informe de inspección de extintores - ${sel.loc}` : 'Reporte de inspecciones mensuales de extintores',
+      sel.round ? [
+        `Inspección completa: ${sel.round.done} de ${sel.round.total} extintores`,
+        `Fechas de inspección: ${fmtDMY(sel.round.from)}${sel.round.to !== sel.round.from ? ' al ' + fmtDMY(sel.round.to) : ''}`,
+        `Ubicación: ${sel.loc}`
+      ] : [
+        `Período: ${monthLabel(sel.month)}`,
+        `Ubicación: ${sel.loc === 'ALL' ? 'Todas (' + LOCATIONS.join(', ') + ')' : sel.loc}`
+      ]);
+
+    // Resumen por KM
+    pdfFont(doc,'bold',11,INK); doc.text('Resumen', PG.M, y); y += 4;
+    const heads = ['Ubicación','Extintores','Inspeccionados','Pendientes','Con no conformidad'];
+    const widths = [50, 30, 35, 30, 35];
+    const tableRows = rows.map(r=>[r.loc, r.total, r.done, r.pending, r.nc]);
+    if(rows.length > 1) tableRows.push(['Total', rows.reduce((n,r)=>n+r.total,0), rows.reduce((n,r)=>n+r.done,0), rows.reduce((n,r)=>n+r.pending,0), rows.reduce((n,r)=>n+r.nc,0)]);
+    doc.setFillColor(SOFT[0], SOFT[1], SOFT[2]); doc.rect(PG.M, y, PG.CW, 7, 'F');
+    pdfFont(doc,'bold',8.5,INK);
+    let x = PG.M; heads.forEach((h,i)=>{ doc.text(h, i === 0 ? x + 2 : x + widths[i] - 2, y + 4.7, i === 0 ? {} : {align:'right'}); x += widths[i]; });
+    y += 7;
+    tableRows.forEach((r, ri)=>{
+      const isTotal = rows.length > 1 && ri === tableRows.length - 1;
+      pdfFont(doc, isTotal ? 'bold' : 'normal', 9, INK);
+      let cx = PG.M;
+      r.forEach((v, i)=>{ doc.text(String(v), i === 0 ? cx + 2 : cx + widths[i] - 2, y + 4.5, i === 0 ? {} : {align:'right'}); cx += widths[i]; });
+      doc.setDrawColor(RULE[0], RULE[1], RULE[2]); doc.setLineWidth(0.2); doc.line(PG.M, y + 6.5, PG.M + PG.CW, y + 6.5);
+      y += 6.5;
+    });
+    y += 7;
+
+    // Extintores sin inspección
+    pdfFont(doc,'bold',11,INK);
+    y = ensureSpace(doc, y, 14);
+    doc.text(pdfSafe(`Extintores sin inspección ${sel.round ? 'vigente' : 'en este período'} (${pendingExts.length})`), PG.M, y); y += 5;
+    if(!pendingExts.length){
+      pdfFont(doc,'normal',9,MUTED); doc.text((sel.round ? 'Todos los extintores del KM fueron inspeccionados.' : 'Todos los extintores tienen al menos una inspección en el período.'), PG.M, y + 1); y += 7;
+    } else {
+      for(let i = 0; i < pendingExts.length; i += 2){
+        y = ensureSpace(doc, y, 5);
+        pdfFont(doc,'normal',8.5,INK);
+        [pendingExts[i], pendingExts[i+1]].forEach((e, ci)=>{
+          if(e) doc.text(pdfSafe(`${e.location} | ${e.code} | ${e.ubicacion || e.area}`), PG.M + ci * (PG.CW/2), y + 2.6);
+        });
+        y += 4.4;
+      }
+      y += 7;
+    }
+
+    // Inspectores
+    const who = {};
+    insps.forEach(i=>{ const k = nameKey(i.inspector) || '(sin nombre)'; const w = (who[k] = who[k] || {name: cleanName(i.inspector) || '(sin nombre)', n: 0}); w.n++; });
+    const whoList = Object.keys(who).map(k=>who[k]).sort((a,b)=> b.n - a.n || a.name.localeCompare(b.name));
+    if(whoList.length){
+      y = ensureSpace(doc, y, 14);
+      pdfFont(doc,'bold',11,INK); doc.text('Inspectores', PG.M, y); y += 5;
+      whoList.forEach(w=>{
+        y = ensureSpace(doc, y, 5);
+        pdfFont(doc,'normal',9,INK); doc.text(pdfSafe(`${w.name}: ${w.n} ${w.n === 1 ? 'inspección' : 'inspecciones'}`), PG.M, y + 1.5); y += 4.6;
+      });
+      y += 5;
+    }
+
+    // Detalle
+    y = ensureSpace(doc, y, 14);
+    pdfFont(doc,'bold',11,INK); doc.text(pdfSafe(`Detalle de inspecciones (${insps.length})`), PG.M, y); y += 6;
+    if(!insps.length){
+      pdfFont(doc,'normal',9,MUTED); doc.text(`No hay inspecciones registradas ${scopeTxt}.`, PG.M, y + 1);
+    }
+    insps.forEach((insp, idx)=>{
+      const blk = { ext: byId[insp.extId], insp, sig: sigs[idx] };
+      const h = drawInspectionBlock(doc, y, blk, true) - y;
+      y = ensureSpace(doc, y, h);
+      y = drawInspectionBlock(doc, y, blk, false);
+    });
+
+    drawFooters(doc, `Generado: ${nowStamp()}`);
+    return { doc, filename: sel.round
+      ? `informe-inspeccion-${sel.loc}-${sel.round.to || todayISO()}.pdf`
+      : `reporte-inspecciones-${sel.loc === 'ALL' ? 'todas' : sel.loc}-${sel.month}.pdf` };
+  }
+
+  // Informe de un KM con su inspección completa: la última inspección vigente (30 días) de cada extintor.
+  function makeKmRoundPdf(loc){
+    return makePeriodPdf({ loc, round: roundInfo(loc) });
+  }
+
+  // Genera y descarga. okMsg / failMsg permiten personalizar los avisos.
+  async function runPdf(btn, makeFn, okMsg, failMsg){
+    const label = btn ? btn.textContent : '';
+    if(btn){ btn.disabled = true; btn.textContent = 'Generando PDF…'; }
+    try{
+      const r = await makeFn();
+      r.doc.save(r.filename);
+      toast(okMsg || ('PDF generado: ' + r.filename));
+    }catch(e){
+      console.error(e);
+      toast(failMsg || (/generador de PDF/.test(e.message || '') ? e.message + '. Revise su conexión a internet.' : 'No se pudo generar el PDF.'));
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = label; }
+    }
+  }
+
+  function getAutoPdf(){ try{ return localStorage.getItem('xochi-auto-pdf') !== '0'; }catch(e){ return true; } }
+  function setAutoPdf(v){ try{ localStorage.setItem('xochi-auto-pdf', v ? '1' : '0'); }catch(e){} }
+
+  let pdfSel = null;
+  function pdfSelection(){
+    if(!pdfSel){ const t = todayISO(); pdfSel = { loc:'ALL', year:+t.slice(0,4), month:+t.slice(5,7) }; }
+    return pdfSel;
+  }
+  const MONTH_NAMES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  function pdfPanelHtml(){
+    const sel = pdfSelection(), nowY = +todayISO().slice(0,4);
+    const years = []; for(let y = nowY; y >= nowY - 3; y--) years.push(y);
+    if(years.indexOf(sel.year) < 0) years.push(sel.year);
+    return `<div class="pdf-panel">
+      <h2 class="pdf-title">Reporte PDF de inspecciones</h2>
+      <div class="pdf-controls">
+        <label>Ubicación<select id="pdfLoc"><option value="ALL"${sel.loc==='ALL'?' selected':''}>Todas</option>${LOCATIONS.map(l=>`<option value="${l}"${sel.loc===l?' selected':''}>${l}</option>`).join('')}</select></label>
+        <label>Mes<select id="pdfMonth">${MONTH_NAMES.map((m,i)=>`<option value="${i+1}"${sel.month===i+1?' selected':''}>${m}</option>`).join('')}</select></label>
+        <label>Año<select id="pdfYear">${years.map(y=>`<option value="${y}"${sel.year===y?' selected':''}>${y}</option>`).join('')}</select></label>
+        <button class="btn primary" id="pdfGen" type="button">Generar PDF</button>
+      </div>
+      <div class="rep-note" style="margin-top:10px;">Incluye un resumen por KM, los extintores sin inspección del mes y el detalle de cada inspección con la firma del inspector. También puede descargar el PDF de una sola inspección desde el Historial de cada extintor.</div>
+    </div>`;
+  }
+  function bindPdfPanel(){
+    const sel = pdfSelection();
+    $("#pdfLoc").onchange   = ()=>{ sel.loc = $("#pdfLoc").value; };
+    $("#pdfMonth").onchange = ()=>{ sel.month = +$("#pdfMonth").value; };
+    $("#pdfYear").onchange  = ()=>{ sel.year = +$("#pdfYear").value; };
+    $("#pdfGen").onclick = ()=> runPdf($("#pdfGen"), ()=> makePeriodPdf({ loc: sel.loc, month: `${sel.year}-${String(sel.month).padStart(2,'0')}` }));
+  }
+
   let activeView = "home";
   function setView(v){
     activeView = v;
@@ -915,6 +1342,7 @@
     $("#reporteRoot").style.display = home ? "none" : "";
     renderRouteStrip();
     renderAlertBar();
+    renderRounds();
     if(!home){ $("#alertBar").classList.remove('show'); $("#pendingBar").classList.remove('show'); }
     refreshPeopleNames();
     if(home) renderAreas(); else renderReporte();
@@ -964,6 +1392,7 @@
     $("#mInspector").value = "";
     $("#mDate").value = todayISO();
     $("#mObs").value = "";
+    $("#autoPdf").checked = getAutoPdf();
     renderChecklist();
     clearSig('mSig');
 
@@ -1065,6 +1494,7 @@
     setTimeout(setupSignaturePads, 30);
   }
   $$('.tab').forEach(t=> t.onclick = ()=> switchTab(t.dataset.tab));
+  $("#autoPdf").onchange = ()=> setAutoPdf($("#autoPdf").checked);
 
   function renderChecklist(){
     const root = $("#checklistItems"); root.innerHTML = "";
@@ -1091,7 +1521,8 @@
 
   function renderHistory(extId){
     const root = $("#historyList");
-    const inspections = data.inspections.filter(r=>r.extId===extId).map(r=>({...r,kind:'Inspección de 15 días'}));
+    const extObj = data.extinguishers.find(e=>e.id===extId);
+    const inspections = data.inspections.filter(r=>r.extId===extId).map(r=>({...r,kind:'Inspección mensual'}));
     const maints = data.maintenance.filter(r=>r.extId===extId).map(r=>({...r,kind:'Mantenimiento anual'}));
     const all = inspections.concat(maints).sort((a,b)=>b.date.localeCompare(a.date));
     root.innerHTML = "";
@@ -1103,7 +1534,7 @@
       const div = document.createElement('div');
       div.className = "hist-item";
       let issuesHtml = "";
-      if(r.kind==='Inspección de 15 días' && r.hasIssues){
+      if(r.kind==='Inspección mensual' && r.hasIssues){
         const bad = (r.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label);
         issuesHtml = `<div class="issues">No conforme: ${bad.join(', ')}</div>`;
       }
@@ -1113,6 +1544,12 @@
         ${r.obs? `<div style="font-size:12.5px;margin-top:4px;">${obsHtml(r.obs)}</div>`:''}
         ${typeof r.signature==='string' && /^data:image\/png;base64,[A-Za-z0-9+\/=]+$/.test(r.signature) ? `<img class="sig-img" alt="Firma" src="${r.signature}">` : ''}
       `;
+      if(r.kind === 'Inspección mensual' && extObj){
+        const pb = document.createElement('button');
+        pb.type = 'button'; pb.className = 'btn ghost hist-pdf'; pb.textContent = 'Descargar PDF';
+        pb.onclick = (ev)=>{ ev.stopPropagation(); runPdf(pb, ()=>makeInspectionPdf(extObj, r)); };
+        div.appendChild(pb);
+      }
       root.appendChild(div);
     });
   }
@@ -1205,10 +1642,24 @@
       inspector: $("#mInspector").value.trim(), checklist, hasIssues,
       obs: $("#mObs").value.trim(), signature: sigDataUrl('mSig')
     };
+    const extSaved = data.extinguishers.find(e=>e.id===record.extId);
+    const locSaved = extSaved ? extSaved.location : null;
+    const before = locSaved ? roundInfo(locSaved) : null;
     data.inspections.push(record);
+    const after = locSaved ? roundInfo(locSaved) : null;
+    // La inspección del KM se completa cuando este registro deja al KM sin extintores pendientes.
+    const kmCompleted = !!(before && after && !before.complete && after.complete);
     closePanel();
     goHome();
-    toast(hasIssues ? "Inspección guardada — se registraron no conformidades." : "Inspección guardada.");
+    const savedMsg = hasIssues ? "Inspección guardada — se registraron no conformidades." : "Inspección guardada.";
+    toast(savedMsg);
+    if(kmCompleted){
+      if(getAutoPdf()){
+        runPdf(null, ()=>makeKmRoundPdf(locSaved), `${savedMsg} ${locSaved}: inspección completa, informe PDF descargado.`, `${savedMsg} ${locSaved}: inspección completa, pero no se pudo generar el PDF. Descárguelo desde Inicio.`);
+      } else {
+        toast(`${savedMsg} ${locSaved}: inspección completa; descargue el informe desde Inicio.`);
+      }
+    }
     const res = await apiPost('addInspection', record);
     if(!res.ok) toast("No se pudo sincronizar la inspección con la base de datos.");
   }
