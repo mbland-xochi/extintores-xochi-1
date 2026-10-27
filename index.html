@@ -89,6 +89,37 @@
   }
   .pendingbar.show{display:block;}
 
+  /* navegación entre vistas */
+  .viewnav{display:flex;gap:8px;margin-bottom:18px;}
+  .viewbtn{
+    background:var(--surface);border:1px solid var(--line);color:var(--ink-dim);
+    border-radius:20px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;
+    transition:color .15s,border-color .15s,background .15s;
+  }
+  .viewbtn:hover{color:var(--ink);border-color:var(--ink-faint);}
+  .viewbtn.active{background:var(--surface-3);color:var(--ink);border-color:var(--ink-faint);}
+
+  /* reporte de uso */
+  .rep-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .rep-week{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .rep-week .label{font-size:15px;font-weight:600;min-width:200px;text-align:center;}
+  .rep-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
+  .rep-tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px;}
+  .rep-tile .n{font-family:'Oswald',system-ui,sans-serif;font-size:28px;font-weight:600;line-height:1.1;}
+  .rep-tile .t{font-size:12px;color:var(--ink-dim);margin-top:2px;}
+  .rep-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);}
+  table.rep{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.rep th,table.rep td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;}
+  table.rep th{font-size:11.5px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.4px;font-weight:600;background:var(--surface-2);}
+  table.rep th.num,table.rep td.num{text-align:right;}
+  table.rep tr:last-child td{border-bottom:none;}
+  table.rep tr.clickable{cursor:pointer;}
+  table.rep tr.clickable:hover td,table.rep tr.sel td{background:var(--surface-2);}
+  table.rep td.total{font-weight:700;}
+  .rep-h2{font-size:15px;margin:24px 0 10px;font-weight:600;}
+  .rep-note{font-size:12px;color:var(--ink-faint);margin-top:12px;line-height:1.6;}
+  .rep-empty{padding:22px;text-align:center;color:var(--ink-faint);font-size:13px;}
+
   /* observaciones siempre en negrita */
   .obs{font-weight:700;color:var(--ink);}
   .sig-img{display:block;margin-top:8px;max-height:64px;max-width:100%;background:var(--surface-3);border:1px solid var(--line);border-radius:6px;padding:4px 8px;}
@@ -249,10 +280,17 @@
     <div class="route-strip" id="routeStrip"></div>
   </header>
 
+  <nav class="viewnav" id="viewNav">
+    <button type="button" class="viewbtn active" data-view="home">Inicio</button>
+    <button type="button" class="viewbtn" data-view="reporte">Reporte de uso</button>
+  </nav>
+
   <div class="alertbar" id="alertBar"></div>
   <div class="pendingbar" id="pendingBar"></div>
 
   <div id="areasRoot" class="loading">Conectando con la base de datos…</div>
+  <div id="reporteRoot" style="display:none;"></div>
+  <datalist id="peopleNames"></datalist>
 
   <div class="footnote">Checklist de inspección quincenal (cada 15 días) basado en criterios de inspección visual NFPA 10.<br>Los datos se guardan compartidos para todo el equipo Xochi.</div>
 </div>
@@ -280,7 +318,7 @@
     </div>
 
     <div class="tabpage active" id="tab-monthly">
-      <div class="field"><label>Nombre del inspector (obligatorio)</label><input type="text" id="mInspector" placeholder="Nombre y apellido"></div>
+      <div class="field"><label>Nombre del inspector (obligatorio)</label><input type="text" id="mInspector" list="peopleNames" autocomplete="off" placeholder="Nombre y apellido"></div>
       <div class="field"><label>Fecha</label><input type="date" id="mDate"></div>
       <div id="checklistItems"></div>
       <div class="field" style="margin-top:14px;"><label>Observaciones</label><textarea id="mObs" placeholder="Detalle de no conformidades, si aplica"></textarea></div>
@@ -370,7 +408,7 @@
   <div class="modal">
     <h3>Reportar uso de extintor</h3>
     <div class="field"><label>Fecha de uso</label><input type="date" id="usoFecha"></div>
-    <div class="field"><label>Reportado por</label><input type="text" id="usoReportero" placeholder="Nombre y apellido"></div>
+    <div class="field"><label>Reportado por</label><input type="text" id="usoReportero" list="peopleNames" autocomplete="off" placeholder="Nombre y apellido"></div>
     <div class="field"><label>Motivo / observación</label><textarea id="usoObs" placeholder="ej. conato de incendio en generador, se descargó parcialmente"></textarea></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px;">
       <button class="btn ghost" id="cancelUso">Cancelar</button>
@@ -454,7 +492,11 @@
   const $ = (sel, root) => (root||document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root||document).querySelectorAll(sel));
   const uid = () => Math.random().toString(36).slice(2,10);
-  const todayISO = () => new Date().toISOString().slice(0,10);
+  // Fecha LOCAL en formato yyyy-mm-dd (toISOString usa UTC y en Guatemala, después de las 6 pm, daría el día siguiente).
+  function toLocalISO(dt){
+    return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+  }
+  const todayISO = () => toLocalISO(new Date());
   const fmtDate = (iso) => { if(!iso) return "—"; const d=new Date(iso+"T00:00:00"); return d.toLocaleDateString('es-GT',{day:'2-digit',month:'short',year:'numeric'}); };
 
   // Los extintores de Xochi se recargan cada 1 año. Al registrar una recarga en el
@@ -465,7 +507,7 @@
   function addYearsISO(dateStr, years){
     const d = new Date((dateStr || todayISO()) + "T00:00:00");
     d.setFullYear(d.getFullYear() + years);
-    return d.toISOString().slice(0,10);
+    return toLocalISO(d);
   }
 
   function toast(msg){
@@ -691,17 +733,170 @@
 
   function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  function renderAll(){
-    renderRouteStrip();
-    renderAlertBar();
-    renderAreas();
+  // ---------- reporte de uso (quién y cuántas veces, por semana) ----------
+  // No hay usuarios: se cuentan los registros guardados con nombre —inspecciones (inspector),
+  // mantenimientos (técnico) y usos reportados (quien reporta)— y se agrupan por persona y semana
+  // (lunes a domingo, según la fecha del registro).
+  function nameKey(n){ return (n||"").normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+  function cleanName(n){ return (n||"").replace(/\s+/g,' ').trim(); }
+  function dateOnly(v){
+    if(!v) return "";
+    if(typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const dt = new Date(v);                       // p. ej. "2026-10-26T06:00:00.000Z" que devuelve Google Sheets
+    return isNaN(dt) ? "" : toLocalISO(dt);
+  }
+  function shiftISO(iso, days){
+    const [y,m,d] = iso.split('-').map(Number);
+    const dt = new Date(y, m-1, d, 12);
+    dt.setDate(dt.getDate() + days);
+    return toLocalISO(dt);
+  }
+  function weekStartOf(iso){
+    const [y,m,d] = iso.split('-').map(Number);
+    const dt = new Date(y, m-1, d, 12);
+    return shiftISO(iso, -((dt.getDay()+6) % 7));  // lunes
+  }
+  function fmtShort(iso){
+    const [y,m,d] = iso.split('-').map(Number);
+    return new Date(y, m-1, d, 12).toLocaleDateString('es-GT',{day:'numeric',month:'short'});
+  }
+  function weekLabel(startIso){
+    const end = shiftISO(startIso, 6);
+    return `${fmtShort(startIso)} – ${fmtShort(end)} ${end.slice(0,4)}`;
   }
 
-  // Vuelve a la pantalla principal (Inicio), arriba del todo.
-  function goHome(){
+  function buildUsage(){
+    const rows = [];
+    data.inspections.forEach(r=> rows.push({date:dateOnly(r.date), name:r.inspector, kind:'insp'}));
+    data.maintenance.forEach(r=> rows.push({date:dateOnly(r.date), name:r.tecnico, kind:'mant'}));
+    (data.usageReports||[]).forEach(r=> rows.push({date:dateOnly(r.date), name:r.reporter, kind:'uso'}));
+    const valid = rows.filter(r=>r.date);
+
+    // nombre a mostrar por persona: la escritura más usada (se ignoran mayúsculas, tildes y espacios)
+    const spell = {};
+    valid.forEach(r=>{
+      const k = nameKey(r.name) || '(sin nombre)', c = cleanName(r.name) || '(sin nombre)';
+      (spell[k] = spell[k] || {})[c] = (spell[k][c]||0) + 1;
+    });
+    const display = {};
+    Object.keys(spell).forEach(k=>{ display[k] = Object.entries(spell[k]).sort((a,b)=>b[1]-a[1])[0][0]; });
+
+    const weeks = {};   // lunes -> { clave de persona -> {insp,mant,uso} }
+    valid.forEach(r=>{
+      const k = nameKey(r.name) || '(sin nombre)';
+      const wk = weekStartOf(r.date);
+      const p = ((weeks[wk] = weeks[wk] || {})[k] = weeks[wk][k] || {insp:0,mant:0,uso:0});
+      p[r.kind]++;
+    });
+    return { weeks, display };
+  }
+  function weekPeople(usage, wk){
+    const w = usage.weeks[wk] || {};
+    return Object.keys(w).map(k=>({ name: usage.display[k], ...w[k], total: w[k].insp + w[k].mant + w[k].uso }))
+      .sort((a,b)=> b.total - a.total || a.name.localeCompare(b.name));
+  }
+  function weekTotal(usage, wk){ return weekPeople(usage, wk).reduce((n,p)=>n+p.total, 0); }
+
+  let reportWeek = null;   // lunes de la semana mostrada
+  function renderReporte(){
+    const root = $("#reporteRoot");
+    const usage = buildUsage();
+    const thisWeek = weekStartOf(todayISO());
+    if(!reportWeek) reportWeek = thisWeek;
+    const people = weekPeople(usage, reportWeek);
+    const total = people.reduce((n,p)=>n+p.total, 0);
+    const prevTotal = weekTotal(usage, shiftISO(reportWeek, -7));
+
+    // historial: de la semana con registros más antigua hasta la actual (máx. 12)
+    const allWeeks = Object.keys(usage.weeks).concat([thisWeek]).sort();
+    const first = allWeeks[0];
+    const hist = [];
+    for(let wk = thisWeek; wk >= first && hist.length < 12; wk = shiftISO(wk, -7)) hist.push(wk);
+
+    root.innerHTML = `
+      <div class="rep-head">
+        <div class="rep-week">
+          <button class="btn ghost" id="repPrev" type="button">◀</button>
+          <div class="label">Semana del ${weekLabel(reportWeek)}</div>
+          <button class="btn ghost" id="repNext" type="button" ${reportWeek >= thisWeek ? 'disabled' : ''}>▶</button>
+          ${reportWeek !== thisWeek ? '<button class="btn subtle" id="repNow" type="button">Esta semana</button>' : ''}
+        </div>
+        <button class="btn subtle" id="repCsv" type="button">Descargar CSV</button>
+      </div>
+
+      <div class="rep-tiles">
+        <div class="rep-tile"><div class="n">${total}</div><div class="t">Registros en la semana</div></div>
+        <div class="rep-tile"><div class="n">${people.length}</div><div class="t">Personas que usaron la plataforma</div></div>
+        <div class="rep-tile"><div class="n">${prevTotal}</div><div class="t">Registros la semana anterior</div></div>
+      </div>
+
+      <div class="rep-scroll">${
+        people.length ? `<table class="rep">
+          <thead><tr><th>Persona</th><th class="num">Inspecciones</th><th class="num">Mantenimientos</th><th class="num">Usos reportados</th><th class="num">Total</th></tr></thead>
+          <tbody>${people.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td class="num">${p.insp}</td><td class="num">${p.mant}</td><td class="num">${p.uso}</td><td class="num total">${p.total}</td></tr>`).join('')}</tbody>
+        </table>` : `<div class="rep-empty">Sin registros en esta semana.</div>`}
+      </div>
+
+      <h2 class="rep-h2">Historial por semana</h2>
+      <div class="rep-scroll"><table class="rep">
+        <thead><tr><th>Semana</th><th class="num">Personas</th><th class="num">Registros</th></tr></thead>
+        <tbody>${hist.map(wk=>`<tr class="clickable ${wk===reportWeek?'sel':''}" data-week="${wk}"><td>${weekLabel(wk)}${wk===thisWeek?' · actual':''}</td><td class="num">${weekPeople(usage,wk).length}</td><td class="num total">${weekTotal(usage,wk)}</td></tr>`).join('')}</tbody>
+      </table></div>
+
+      <div class="rep-note">Cuenta los registros guardados con nombre: inspecciones de 15 días (inspector), mantenimientos anuales (técnico) y usos reportados (quien reporta). Semana de lunes a domingo, según la fecha del registro. Las diferencias de mayúsculas, tildes o espacios en un nombre se agrupan como la misma persona.</div>`;
+
+    $("#repPrev").onclick = ()=>{ reportWeek = shiftISO(reportWeek, -7); renderReporte(); };
+    $("#repNext").onclick = ()=>{ if(reportWeek < thisWeek){ reportWeek = shiftISO(reportWeek, 7); renderReporte(); } };
+    const now = $("#repNow"); if(now) now.onclick = ()=>{ reportWeek = thisWeek; renderReporte(); };
+    $$('#reporteRoot tr.clickable').forEach(tr=> tr.onclick = ()=>{ reportWeek = tr.dataset.week; renderReporte(); });
+    $("#repCsv").onclick = ()=> downloadUsageCsv(usage);
+  }
+
+  function downloadUsageCsv(usage){
+    const q = v => '"' + String(v).replace(/"/g,'""') + '"';
+    const lines = [['Semana (lunes)','Semana (domingo)','Persona','Inspecciones','Mantenimientos','Usos reportados','Total'].map(q).join(',')];
+    Object.keys(usage.weeks).sort().reverse().forEach(wk=>{
+      weekPeople(usage, wk).forEach(p=> lines.push([wk, shiftISO(wk,6), p.name, p.insp, p.mant, p.uso, p.total].map(q).join(',')));
+    });
+    const blob = new Blob(['﻿' + lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `reporte-uso-extintores-${todayISO()}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // Sugerencias de nombres ya usados, para que cada persona se escriba siempre igual.
+  function refreshPeopleNames(){
+    const seen = {};
+    data.inspections.forEach(r=>{ const k = nameKey(r.inspector); if(k && !seen[k]) seen[k] = cleanName(r.inspector); });
+    (data.usageReports||[]).forEach(r=>{ const k = nameKey(r.reporter); if(k && !seen[k]) seen[k] = cleanName(r.reporter); });
+    $("#peopleNames").innerHTML = Object.values(seen).sort().map(n=>`<option value="${escapeHtml(n)}"></option>`).join('');
+  }
+
+  let activeView = "home";
+  function setView(v){
+    activeView = v;
+    $$('.viewbtn').forEach(b=> b.classList.toggle('active', b.dataset.view===v));
     renderAll();
     window.scrollTo({top:0, behavior:'smooth'});
   }
+  $$('.viewbtn').forEach(b=> b.onclick = ()=> setView(b.dataset.view));
+
+  function renderAll(){
+    const home = activeView === "home";
+    $("#routeStrip").style.display = home ? "" : "none";
+    $("#areasRoot").style.display = home ? "" : "none";
+    $("#reporteRoot").style.display = home ? "none" : "";
+    renderRouteStrip();
+    renderAlertBar();
+    if(!home){ $("#alertBar").classList.remove('show'); $("#pendingBar").classList.remove('show'); }
+    refreshPeopleNames();
+    if(home) renderAreas(); else renderReporte();
+  }
+
+  // Vuelve a la pantalla principal (Inicio), arriba del todo.
+  function goHome(){ setView('home'); }
 
   // ---------- add extinguisher modal ----------
   function openAddModal(area){
@@ -1073,6 +1268,8 @@
     const root = $("#areasRoot");
     root.className = "loading";
     root.style.display = "";
+    $("#reporteRoot").style.display = "none";
+    $("#viewNav").style.display = "none";
     root.innerHTML = `
       <div style="max-width:560px;margin:0 auto;text-align:left;background:var(--surface);border:1px solid #5C2822;border-radius:10px;padding:20px;">
         <h2 style="margin:0 0 8px;font-size:16px;color:#F3B0AC;">No se pudo conectar con la base de datos</h2>
@@ -1116,6 +1313,7 @@
     const r = await loadData();
     if(!r.ok){ showConnectionError(r.error); return; }
     await seedIfEmpty();
+    $("#viewNav").style.display = "";
     renderAll();
   }
   startUp();
