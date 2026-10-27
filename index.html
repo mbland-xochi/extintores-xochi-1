@@ -99,7 +99,7 @@
   .viewbtn:hover{color:var(--ink);border-color:var(--ink-faint);}
   .viewbtn.active{background:var(--surface-3);color:var(--ink);border-color:var(--ink-faint);}
 
-  /* reporte de uso */
+  /* registros */
   .rep-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
   .rep-week{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .rep-week .label{font-size:15px;font-weight:600;min-width:200px;text-align:center;}
@@ -282,7 +282,7 @@
 
   <nav class="viewnav" id="viewNav">
     <button type="button" class="viewbtn active" data-view="home">Inicio</button>
-    <button type="button" class="viewbtn" data-view="reporte">Reporte de uso</button>
+    <button type="button" class="viewbtn" data-view="reporte">Registros</button>
   </nav>
 
   <div class="alertbar" id="alertBar"></div>
@@ -304,7 +304,7 @@
       <div class="meta" id="panelMeta">—</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;">
-      <button class="btn subtle" id="reportUso" style="padding:6px 11px;font-size:12px;">Reportar uso</button>
+      <button class="btn subtle" id="reportUso" style="padding:6px 11px;font-size:12px;">Reportar descarga</button>
       <button class="close-x" id="closePanel">&times;</button>
     </div>
   </div>
@@ -406,13 +406,13 @@
 <!-- Report usage modal -->
 <div class="modal-scrim" id="usoScrim">
   <div class="modal">
-    <h3>Reportar uso de extintor</h3>
-    <div class="field"><label>Fecha de uso</label><input type="date" id="usoFecha"></div>
+    <h3>Reportar descarga de extintor</h3>
+    <div class="field"><label>Fecha de descarga</label><input type="date" id="usoFecha"></div>
     <div class="field"><label>Reportado por</label><input type="text" id="usoReportero" list="peopleNames" autocomplete="off" placeholder="Nombre y apellido"></div>
     <div class="field"><label>Motivo / observación</label><textarea id="usoObs" placeholder="ej. conato de incendio en generador, se descargó parcialmente"></textarea></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px;">
       <button class="btn ghost" id="cancelUso">Cancelar</button>
-      <button class="btn primary" id="confirmUso">Registrar uso</button>
+      <button class="btn primary" id="confirmUso">Registrar descarga</button>
     </div>
   </div>
 </div>
@@ -590,7 +590,7 @@
     }
 
     if(ext.usado){
-      bump('bad', 'Uso reportado — requiere recarga inmediata');
+      bump('bad', 'Descarga reportada — requiere recarga inmediata');
     }
     checkDate(ext.vencimiento,
       'Vencimiento de recarga: fecha vencida',
@@ -651,7 +651,7 @@
     const hasUrgent = usadoList.length || badList.length || warn1List.length || warn2List.length;
     if(hasUrgent){
       const lines = [];
-      if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como usado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
+      if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como descargado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
       if(noConformidadList.length) lines.push(`<div class="line"><strong>${noConformidadList.length}</strong> con no conformidad sin resolver de su última inspección de 15 días.</div>`);
       if(fechaVencidaList.length) lines.push(`<div class="line"><strong>${fechaVencidaList.length}</strong> con fecha vencida (recarga, prueba hidrostática o mantenimiento anual).</div>`);
       if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
@@ -733,9 +733,9 @@
 
   function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  // ---------- reporte de uso (quién y cuántas veces, por semana) ----------
+  // ---------- registros (quién y cuántas veces, por semana) ----------
   // No hay usuarios: se cuentan los registros guardados con nombre —inspecciones (inspector),
-  // mantenimientos (técnico) y usos reportados (quien reporta)— y se agrupan por persona y semana
+  // mantenimientos (técnico) y descargas reportadas (quien reporta)— y se agrupan por persona y semana
   // (lunes a domingo, según la fecha del registro).
   function nameKey(n){ return (n||"").normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
   function cleanName(n){ return (n||"").replace(/\s+/g,' ').trim(); }
@@ -832,7 +832,7 @@
 
       <div class="rep-scroll">${
         people.length ? `<table class="rep">
-          <thead><tr><th>Persona</th><th class="num">Inspecciones</th><th class="num">Mantenimientos</th><th class="num">Usos reportados</th><th class="num">Total</th></tr></thead>
+          <thead><tr><th>Persona</th><th class="num">Inspecciones</th><th class="num">Mantenimientos</th><th class="num">Descargas reportadas</th><th class="num">Total</th></tr></thead>
           <tbody>${people.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td class="num">${p.insp}</td><td class="num">${p.mant}</td><td class="num">${p.uso}</td><td class="num total">${p.total}</td></tr>`).join('')}</tbody>
         </table>` : `<div class="rep-empty">Sin registros en esta semana.</div>`}
       </div>
@@ -843,7 +843,7 @@
         <tbody>${hist.map(wk=>`<tr class="clickable ${wk===reportWeek?'sel':''}" data-week="${wk}"><td>${weekLabel(wk)}${wk===thisWeek?' · actual':''}</td><td class="num">${weekPeople(usage,wk).length}</td><td class="num total">${weekTotal(usage,wk)}</td></tr>`).join('')}</tbody>
       </table></div>
 
-      <div class="rep-note">Cuenta los registros guardados con nombre: inspecciones de 15 días (inspector), mantenimientos anuales (técnico) y usos reportados (quien reporta). Semana de lunes a domingo, según la fecha del registro. Las diferencias de mayúsculas, tildes o espacios en un nombre se agrupan como la misma persona.</div>`;
+      <div class="rep-note">Cuenta los registros guardados con nombre: inspecciones de 15 días (inspector), mantenimientos anuales (técnico) y descargas reportadas (quien reporta). Semana de lunes a domingo, según la fecha del registro. Las diferencias de mayúsculas, tildes o espacios en un nombre se agrupan como la misma persona.</div>`;
 
     $("#repPrev").onclick = ()=>{ reportWeek = shiftISO(reportWeek, -7); renderReporte(); };
     $("#repNext").onclick = ()=>{ if(reportWeek < thisWeek){ reportWeek = shiftISO(reportWeek, 7); renderReporte(); } };
@@ -854,14 +854,14 @@
 
   function downloadUsageCsv(usage){
     const q = v => '"' + String(v).replace(/"/g,'""') + '"';
-    const lines = [['Semana (lunes)','Semana (domingo)','Persona','Inspecciones','Mantenimientos','Usos reportados','Total'].map(q).join(',')];
+    const lines = [['Semana (lunes)','Semana (domingo)','Persona','Inspecciones','Mantenimientos','Descargas reportadas','Total'].map(q).join(',')];
     Object.keys(usage.weeks).sort().reverse().forEach(wk=>{
       weekPeople(usage, wk).forEach(p=> lines.push([wk, shiftISO(wk,6), p.name, p.insp, p.mant, p.uso, p.total].map(q).join(',')));
     });
     const blob = new Blob(['﻿' + lines.join('\r\n')], {type:'text/csv;charset=utf-8'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `reporte-uso-extintores-${todayISO()}.csv`;
+    a.download = `registros-extintores-${todayISO()}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   }
@@ -976,7 +976,7 @@
     const info = ext.usadoInfo || {};
     el.innerHTML = `
       <div class="used-banner">
-        <span>⚠ Reportado como usado el ${fmtDate(info.date)}${info.reporter?' por '+escapeHtml(info.reporter):''}${info.obs?' — '+obsHtml(info.obs):''}. Requiere recarga inmediata.</span>
+        <span>⚠ Reportado como descargado el ${fmtDate(info.date)}${info.reporter?' por '+escapeHtml(info.reporter):''}${info.obs?' — '+obsHtml(info.obs):''}. Requiere recarga inmediata.</span>
         <button class="btn ghost" id="clearUsado" style="padding:5px 10px;font-size:11.5px;">Marcar como recargado</button>
       </div>`;
     $("#clearUsado").onclick = async ()=>{
@@ -998,7 +998,7 @@
   $("#usoScrim").addEventListener('click', (e)=>{ if(e.target.id==='usoScrim') $("#usoScrim").classList.remove('show'); });
   $("#confirmUso").onclick = async ()=>{
     if(!activeExtId) return;
-    if(!$("#usoReportero").value.trim()){ toast("Ingrese quién reporta el uso."); return; }
+    if(!$("#usoReportero").value.trim()){ toast("Ingrese quién reporta la descarga."); return; }
     const ext = data.extinguishers.find(e=>e.id===activeExtId);
     if(!ext) return;
     const usoRecord = {
@@ -1015,7 +1015,7 @@
     renderAll();
     renderUsedBanner(ext);
     const res = await apiPost('reportUso', usoRecord);
-    if(res.ok) toast("Uso registrado — extintor marcado en ATENCIÓN hasta su recarga.");
+    if(res.ok) toast("Descarga registrada — extintor marcado en ATENCIÓN hasta su recarga.");
   };
 
   function closePanel(){
