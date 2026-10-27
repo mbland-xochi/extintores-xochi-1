@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -103,19 +103,15 @@
   .obs{font-weight:700;color:var(--ink);}
   .sig-img{display:block;margin-top:8px;max-height:64px;max-width:100%;background:var(--surface-3);border:1px solid var(--line);border-radius:6px;padding:4px 8px;}
 
-  /* resumen de garitas */
-  .gar-km{margin-bottom:26px;}
-  .gar-km-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:6px;}
-  .gar-km-head h2{font-size:17px;margin:0;font-weight:600;}
-  .gar-km-head span{font-size:12px;color:var(--ink-faint);}
-  .gar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
-  .gar-card{
-    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
-    padding:14px;cursor:pointer;transition:border-color .15s;
-  }
-  .gar-card:hover{border-color:var(--ink-faint);}
-  .gar-card.bad{border-color:#5C2822;}
-  .gar-row{margin-top:9px;font-size:12.5px;line-height:1.5;}
+  /* resumen de garitas: un cuadro por KM */
+  .gar-boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:16px;align-items:start;}
+  .gar-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
+  .gar-box-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .gar-box-head h2{font-size:17px;margin:0;font-weight:600;}
+  .gar-box-head span{font-size:12px;color:var(--ink-faint);}
+  .gar-item{padding:12px 0;border-top:1px solid var(--line);cursor:pointer;}
+  .gar-item:hover .ext-code{color:var(--focus);}
+  .gar-row{margin-top:8px;font-size:12.5px;line-height:1.5;}
   .gar-row .lbl{display:block;font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}
   .gar-nc{color:#F3B0AC;}
   .gar-ok{color:#8FD6A3;}
@@ -664,6 +660,25 @@
     }
   }
 
+  // Contenido de un extintor. Lo usan IGUAL la vista Inicio (por KM) y el Resumen de garitas,
+  // para que ambas siempre muestren los mismos datos.
+  function extSummaryHtml(ext){
+    const status = extStatus(ext);
+    const insp = lastInspection(ext.id);
+    return `
+      <div class="ext-top">
+        <div>
+          <div class="ext-code">${escapeHtml(ext.code||'(sin código)')}</div>
+          <div class="ext-type">${escapeHtml(ext.tipo||'')} · ${escapeHtml(ext.capacidad||'—')}</div>
+        </div>
+        <span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>
+      </div>
+      <div class="ext-meta">${ext.ubicacion ? escapeHtml(ext.ubicacion)+' · ' : ''}Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
+      ${status.reasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(status.reasons.join('; '))}</div>` : ''}
+      ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección de 15 días pendiente</div>` : ''}
+    `;
+  }
+
   function renderAreas(){
     const root = $("#areasRoot");
     root.className = "areas";
@@ -690,22 +705,9 @@
         wrap.appendChild(p);
       } else {
         exts.forEach(ext=>{
-          const status = extStatus(ext);
-          const insp = lastInspection(ext.id);
           const card = document.createElement('div');
           card.className = "ext-card";
-          card.innerHTML = `
-            <div class="ext-top">
-              <div>
-                <div class="ext-code">${escapeHtml(ext.code||'(sin código)')}</div>
-                <div class="ext-type">${ext.tipo||''} · ${ext.capacidad||'—'}</div>
-              </div>
-              <span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>
-            </div>
-            <div class="ext-meta">${ext.ubicacion ? escapeHtml(ext.ubicacion)+' · ' : ''}Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
-            ${status.reasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(status.reasons.join('; '))}</div>` : ''}
-            ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección de 15 días pendiente</div>` : ''}
-          `;
+          card.innerHTML = extSummaryHtml(ext);
           card.onclick = ()=> openPanel(ext.id);
           wrap.appendChild(card);
         });
@@ -724,47 +726,38 @@
   function renderGaritas(){
     const root = $("#garitasRoot");
     root.innerHTML = "";
-    LOCATIONS.forEach(loc=>{
-      const garitas = data.extinguishers
-        .filter(e=>e.location===loc && e.area==="Garitas")
-        .map(e=>({ext:e, st:extStatus(e), insp:lastInspection(e.id)}))
-        .sort((a,b)=> LEVEL_ORDER[b.st.level]-LEVEL_ORDER[a.st.level] || (a.ext.code||"").localeCompare(b.ext.code||""));
+    const grid = document.createElement('div');
+    grid.className = "gar-boxes";
 
-      const sec = document.createElement('div');
-      sec.className = "gar-km";
-      sec.innerHTML = `<div class="gar-km-head"><h2>${loc}</h2><span>${garitas.length} extintor${garitas.length===1?'':'es'} en garitas</span></div>`;
+    LOCATIONS.forEach(loc=>{
+      // mismas garitas y mismo orden que la columna "Garitas" de cada KM en Inicio
+      const garitas = data.extinguishers.filter(e=>e.location===loc && e.area==="Garitas");
+
+      const box = document.createElement('div');
+      box.className = "gar-box";
+      box.innerHTML = `<div class="gar-box-head"><h2>${loc}</h2><span>Garitas · ${garitas.length}</span></div>`;
+
       if(!garitas.length){
-        sec.innerHTML += `<div class="gar-none" style="font-size:12.5px;">Sin extintores de garitas registrados.</div>`;
+        box.innerHTML += `<div class="gar-none" style="font-size:12.5px;padding-top:10px;">Sin extintores registrados.</div>`;
       } else {
-        const grid = document.createElement('div');
-        grid.className = "gar-grid";
-        garitas.forEach(({ext, st, insp})=>{
+        garitas.forEach(ext=>{
+          const insp = lastInspection(ext.id);
           const nc = failedItems(insp);
-          const card = document.createElement('div');
-          card.className = "gar-card" + (st.level==='bad' ? " bad" : "");
-          card.innerHTML = `
-            <div class="ext-top">
-              <div>
-                <div class="ext-code">${escapeHtml(ext.code||'(sin código)')}</div>
-                <div class="ext-type">${escapeHtml(ext.ubicacion||'')} · ${escapeHtml(ext.tipo||'')} · ${escapeHtml(ext.capacidad||'—')}</div>
-              </div>
-              <span class="badge ${st.level}">${LEVEL_LABEL[st.level]}</span>
-            </div>
-            <div class="gar-row"><span class="lbl">Última inspección</span>${insp ? fmtDate(insp.date)+' · '+escapeHtml(insp.inspector||'') : '<span class="gar-none">Sin inspección registrada</span>'}</div>
+          const item = document.createElement('div');
+          item.className = "gar-item";
+          item.innerHTML = extSummaryHtml(ext) + `
             <div class="gar-row"><span class="lbl">No conformidades</span>${
               !insp ? '<span class="gar-none">—</span>'
               : nc.length ? `<span class="gar-nc">${nc.map(escapeHtml).join('; ')}</span>`
               : '<span class="gar-ok">Ninguna</span>'}</div>
-            <div class="gar-row"><span class="lbl">Observaciones</span>${insp && insp.obs ? obsHtml(insp.obs) : '<span class="gar-none">—</span>'}</div>
-            ${st.level!=='ok' && st.reasons.length ? `<div class="gar-row"><span class="lbl">Alerta</span>${escapeHtml(st.reasons.join('; '))}</div>` : ''}
-          `;
-          card.onclick = ()=> openPanel(ext.id);
-          grid.appendChild(card);
+            <div class="gar-row"><span class="lbl">Observaciones</span>${insp && insp.obs ? obsHtml(insp.obs) : '<span class="gar-none">—</span>'}</div>`;
+          item.onclick = ()=> openPanel(ext.id);
+          box.appendChild(item);
         });
-        sec.appendChild(grid);
       }
-      root.appendChild(sec);
+      grid.appendChild(box);
     });
+    root.appendChild(grid);
   }
 
   let activeView = "home";
