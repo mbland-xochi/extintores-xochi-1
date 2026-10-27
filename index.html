@@ -89,33 +89,10 @@
   }
   .pendingbar.show{display:block;}
 
-  /* navegación entre vistas */
-  .viewnav{display:flex;gap:8px;margin-bottom:18px;}
-  .viewbtn{
-    background:var(--surface);border:1px solid var(--line);color:var(--ink-dim);
-    border-radius:20px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;
-    transition:color .15s,border-color .15s,background .15s;
-  }
-  .viewbtn:hover{color:var(--ink);border-color:var(--ink-faint);}
-  .viewbtn.active{background:var(--surface-3);color:var(--ink);border-color:var(--ink-faint);}
-
   /* observaciones siempre en negrita */
   .obs{font-weight:700;color:var(--ink);}
   .sig-img{display:block;margin-top:8px;max-height:64px;max-width:100%;background:var(--surface-3);border:1px solid var(--line);border-radius:6px;padding:4px 8px;}
 
-  /* resumen de garitas: un cuadro por KM */
-  .gar-boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:16px;align-items:start;}
-  .gar-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
-  .gar-box-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
-  .gar-box-head h2{font-size:17px;margin:0;font-weight:600;}
-  .gar-box-head span{font-size:12px;color:var(--ink-faint);}
-  .gar-item{padding:12px 0;border-top:1px solid var(--line);cursor:pointer;}
-  .gar-item:hover .ext-code{color:var(--focus);}
-  .gar-row{margin-top:8px;font-size:12.5px;line-height:1.5;}
-  .gar-row .lbl{display:block;font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}
-  .gar-nc{color:#F3B0AC;}
-  .gar-ok{color:#8FD6A3;}
-  .gar-none{color:var(--ink-faint);}
 
   /* ---------- Area layout ---------- */
   .areas{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
@@ -272,16 +249,10 @@
     <div class="route-strip" id="routeStrip"></div>
   </header>
 
-  <nav class="viewnav" id="viewNav">
-    <button type="button" class="viewbtn active" data-view="home">Inicio</button>
-    <button type="button" class="viewbtn" data-view="garitas">Resumen de garitas</button>
-  </nav>
-
   <div class="alertbar" id="alertBar"></div>
   <div class="pendingbar" id="pendingBar"></div>
 
   <div id="areasRoot" class="loading">Conectando con la base de datos…</div>
-  <div id="garitasRoot" style="display:none;"></div>
 
   <div class="footnote">Checklist de inspección quincenal (cada 15 días) basado en criterios de inspección visual NFPA 10.<br>Los datos se guardan compartidos para todo el equipo Xochi.</div>
 </div>
@@ -553,9 +524,7 @@
     return /^\d+([.,]\d+)?$/.test(v) ? v.replace(',', '.') + " lbs" : v;
   }
   function obsHtml(text){ return text ? `<span class="obs">${escapeHtml(text)}</span>` : ""; }
-  function failedItems(insp){
-    return insp ? (insp.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label) : [];
-  }
+
   const LEVEL_ORDER = {ok:0, warn2:1, warn1:2, bad:3};
   const LEVEL_LABEL = {ok:"AL DÍA", warn2:"VENCE EN 2 MESES", warn1:"VENCE EN 1 MES", bad:"ATENCIÓN"};
   const INSPECTION_CYCLE_DAYS = 15;
@@ -660,8 +629,7 @@
     }
   }
 
-  // Contenido de un extintor. Lo usan IGUAL la vista Inicio (por KM) y el Resumen de garitas,
-  // para que ambas siempre muestren los mismos datos.
+  // Contenido de la tarjeta de cada extintor en la vista Inicio (por KM).
   function extSummaryHtml(ext){
     const status = extStatus(ext);
     const insp = lastInspection(ext.id);
@@ -723,60 +691,16 @@
 
   function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  function renderGaritas(){
-    const root = $("#garitasRoot");
-    root.innerHTML = "";
-    const grid = document.createElement('div');
-    grid.className = "gar-boxes";
-
-    LOCATIONS.forEach(loc=>{
-      // mismas garitas y mismo orden que la columna "Garitas" de cada KM en Inicio
-      const garitas = data.extinguishers.filter(e=>e.location===loc && e.area==="Garitas");
-
-      const box = document.createElement('div');
-      box.className = "gar-box";
-      box.innerHTML = `<div class="gar-box-head"><h2>${loc}</h2><span>Garitas · ${garitas.length}</span></div>`;
-
-      if(!garitas.length){
-        box.innerHTML += `<div class="gar-none" style="font-size:12.5px;padding-top:10px;">Sin extintores registrados.</div>`;
-      } else {
-        garitas.forEach(ext=>{
-          const insp = lastInspection(ext.id);
-          const nc = failedItems(insp);
-          const item = document.createElement('div');
-          item.className = "gar-item";
-          item.innerHTML = extSummaryHtml(ext) + `
-            <div class="gar-row"><span class="lbl">No conformidades</span>${
-              !insp ? '<span class="gar-none">—</span>'
-              : nc.length ? `<span class="gar-nc">${nc.map(escapeHtml).join('; ')}</span>`
-              : '<span class="gar-ok">Ninguna</span>'}</div>
-            <div class="gar-row"><span class="lbl">Observaciones</span>${insp && insp.obs ? obsHtml(insp.obs) : '<span class="gar-none">—</span>'}</div>`;
-          item.onclick = ()=> openPanel(ext.id);
-          box.appendChild(item);
-        });
-      }
-      grid.appendChild(box);
-    });
-    root.appendChild(grid);
-  }
-
-  let activeView = "home";
-  function setView(v){
-    activeView = v;
-    $$('.viewbtn').forEach(b=> b.classList.toggle('active', b.dataset.view===v));
-    renderAll();
-    window.scrollTo({top:0, behavior:'smooth'});
-  }
-  $$('.viewbtn').forEach(b=> b.onclick = ()=> setView(b.dataset.view));
-
   function renderAll(){
-    const home = activeView === "home";
-    $("#routeStrip").style.display = home ? "" : "none";
-    $("#areasRoot").style.display = home ? "" : "none";
-    $("#garitasRoot").style.display = home ? "none" : "";
     renderRouteStrip();
     renderAlertBar();
-    if(home) renderAreas(); else renderGaritas();
+    renderAreas();
+  }
+
+  // Vuelve a la pantalla principal (Inicio), arriba del todo.
+  function goHome(){
+    renderAll();
+    window.scrollTo({top:0, behavior:'smooth'});
   }
 
   // ---------- add extinguisher modal ----------
@@ -1058,7 +982,7 @@
     };
     data.inspections.push(record);
     closePanel();
-    setView('home');
+    goHome();
     toast(hasIssues ? "Inspección guardada — se registraron no conformidades." : "Inspección guardada.");
     const res = await apiPost('addInspection', record);
     if(!res.ok) toast("No se pudo sincronizar la inspección con la base de datos.");
@@ -1149,11 +1073,12 @@
     const root = $("#areasRoot");
     root.className = "loading";
     root.style.display = "";
-    $("#garitasRoot").style.display = "none";
     root.innerHTML = `
       <div style="max-width:560px;margin:0 auto;text-align:left;background:var(--surface);border:1px solid #5C2822;border-radius:10px;padding:20px;">
         <h2 style="margin:0 0 8px;font-size:16px;color:#F3B0AC;">No se pudo conectar con la base de datos</h2>
-        <div style="font-size:13px;color:var(--ink-dim);margin-bottom:12px;">Detalle técnico: <strong style="color:var(--ink);">${escapeHtml(reason)}</strong></div>
+        <div style="font-size:13px;color:var(--ink-dim);margin-bottom:6px;">Detalle técnico: <strong style="color:var(--ink);">${escapeHtml(reason)}</strong></div>
+        <div style="font-size:12px;color:var(--ink-faint);margin-bottom:12px;">Abierto desde: ${escapeHtml(location.origin && location.origin !== 'null' ? location.origin : 'archivo local')}</div>
+        <div id="diagLine" style="font-size:13px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:12px;color:var(--ink-dim);">Diagnosticando…</div>
         <div style="font-size:13px;color:var(--ink-dim);line-height:1.6;">
           Lo más común es que la implementación de Apps Script no esté abierta al público. Revise:
           <ol style="margin:8px 0 0 18px;padding:0;">
@@ -1162,9 +1087,26 @@
             <li>Abra la URL en una ventana de incógnito: debe mostrar texto que empieza con {"extinguishers": — si pide iniciar sesión, es el punto 1.</li>
           </ol>
         </div>
-        <button class="btn primary" id="retryLoad" style="margin-top:16px;">Reintentar</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">
+          <button class="btn primary" id="retryLoad">Reintentar</button>
+          <a class="btn ghost" href="${APPS_SCRIPT_URL}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block;">Abrir la URL de la base de datos</a>
+        </div>
       </div>`;
     $("#retryLoad").onclick = startUp;
+    diagnoseConnection();
+  }
+
+  // Distingue "no se alcanzó a Google" de "Google respondió pero sin permiso":
+  // con mode:'no-cors' la petición solo falla si ni siquiera se pudo llegar al servidor.
+  async function diagnoseConnection(){
+    const el = $("#diagLine");
+    if(!el) return;
+    try{
+      await fetch(APPS_SCRIPT_URL, { mode:'no-cors' });
+      el.innerHTML = "<strong style=\"color:var(--ink);\">Diagnóstico:</strong> Google sí respondió, pero sin dar permiso a esta página. Casi seguro la implementación no está en <strong>Cualquier usuario</strong>, la URL ya no es válida, o el script tiene un error. Use el botón \"Abrir la URL de la base de datos\" y mire qué muestra.";
+    }catch(e){
+      el.innerHTML = "<strong style=\"color:var(--ink);\">Diagnóstico:</strong> <strong>no se alcanzó a Google</strong>. Puede ser falta de internet, un firewall o red de la empresa que bloquea script.google.com, una extensión del navegador (bloqueador de anuncios), o que abrió esta página desde la vista previa de Claude, que bloquea conexiones externas. Ábrala desde su dirección de GitHub Pages.";
+    }
   }
 
   async function startUp(){
