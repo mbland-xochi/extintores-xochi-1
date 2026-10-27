@@ -120,6 +120,13 @@
   .rep-note{font-size:12px;color:var(--ink-faint);margin-top:12px;line-height:1.6;}
   .rep-empty{padding:22px;text-align:center;color:var(--ink-faint);font-size:13px;}
 
+  /* no conformidades por corregir */
+  .nc-box{margin-top:7px;padding:8px 10px;border-left:3px solid var(--red);background:var(--red-dim);border-radius:0 6px 6px 0;}
+  .nc-title{display:block;font-size:10.5px;color:#F3C9C6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+  .nc-list{margin:0;padding-left:16px;font-size:12.5px;font-weight:700;color:#fff;line-height:1.5;}
+  .nc-obs{margin-top:6px;font-size:12px;color:#F3C9C6;}
+  #ncBanner .nc-box{margin:0 0 14px;}
+
   /* observaciones siempre en negrita */
   .obs{font-weight:700;color:var(--ink);}
   .sig-img{display:block;margin-top:8px;max-height:64px;max-width:100%;background:var(--surface-3);border:1px solid var(--line);border-radius:6px;padding:4px 8px;}
@@ -310,6 +317,7 @@
   </div>
   <div class="panel-body">
     <div id="usedBanner"></div>
+    <div id="ncBanner"></div>
     <div class="tabs">
       <div class="tab active" data-tab="monthly">Inspección de 15 días</div>
       <div class="tab" data-tab="annual">Mantenimiento anual</div>
@@ -610,7 +618,11 @@
     }
 
     const insp = lastInspection(ext.id);
-    if(insp && insp.hasIssues) bump('bad', 'No conformidad en última inspección de 15 días');
+    let ncItems = [];
+    if(insp && insp.hasIssues){
+      bump('bad', 'No conformidad en última inspección de 15 días');
+      ncItems = (insp.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label);
+    }
 
     const daysSinceInsp = insp ? Math.floor((now - new Date(insp.date+"T00:00:00"))/DAY) : Infinity;
     const inspectionMissing = daysSinceInsp > INSPECTION_CYCLE_DAYS;
@@ -618,7 +630,7 @@
     // Solo se muestran los motivos que corresponden a la gravedad final (evita mostrar
     // un motivo leve cuando el estado real del extintor es más grave por otra causa).
     const topReasons = reasons.filter(r => r.level === level).map(r => r.text);
-    return { level, reasons: topReasons, inspectionMissing };
+    return { level, reasons: topReasons, inspectionMissing, ncItems, ncObs: (insp && insp.hasIssues) ? (insp.obs||'') : '' };
   }
 
   // ---------- rendering ----------
@@ -672,9 +684,21 @@
   }
 
   // Contenido de la tarjeta de cada extintor en la vista Inicio (por KM).
+  // Lista en negrita las no conformidades de la última inspección (y su observación), para saber qué corregir.
+  function ncBoxHtml(status){
+    if(!status.ncItems.length) return '';
+    return `<div class="nc-box">
+      <span class="nc-title">No conformidades por corregir</span>
+      <ul class="nc-list">${status.ncItems.map(i=>`<li>${escapeHtml(i)}</li>`).join('')}</ul>
+      ${status.ncObs ? `<div class="nc-obs">Observación: ${obsHtml(status.ncObs)}</div>` : ''}
+    </div>`;
+  }
+
   function extSummaryHtml(ext){
     const status = extStatus(ext);
     const insp = lastInspection(ext.id);
+    // Si se pueden listar las no conformidades, se muestran ellas en vez del texto genérico.
+    const shownReasons = status.ncItems.length ? status.reasons.filter(r=>!r.startsWith('No conformidad')) : status.reasons;
     return `
       <div class="ext-top">
         <div>
@@ -684,7 +708,8 @@
         <span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>
       </div>
       <div class="ext-meta">${ext.ubicacion ? escapeHtml(ext.ubicacion)+' · ' : ''}Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
-      ${status.reasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(status.reasons.join('; '))}</div>` : ''}
+      ${shownReasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(shownReasons.join('; '))}</div>` : ''}
+      ${ncBoxHtml(status)}
       ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección de 15 días pendiente</div>` : ''}
     `;
   }
@@ -963,11 +988,16 @@
     $("#iUbicacion").value = ext.ubicacion || "";
 
     renderUsedBanner(ext);
+    renderNcBanner(ext);
     renderHistory(extId);
     switchTab('monthly');
     $("#scrim").classList.add('show');
     $("#panel").classList.add('show');
     setTimeout(setupSignaturePads, 60);
+  }
+
+  function renderNcBanner(ext){
+    $("#ncBanner").innerHTML = ncBoxHtml(extStatus(ext));
   }
 
   function renderUsedBanner(ext){
