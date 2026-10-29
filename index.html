@@ -155,6 +155,10 @@
 
   /* observaciones siempre en negrita */
   .obs{font-weight:700;color:var(--ink);}
+  .obs-warn{margin-top:7px;padding:8px 10px;border-left:3px solid var(--amber);background:var(--amber-dim);border-radius:0 6px 6px 0;}
+  .obs-warn .ow-title{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#F0C374;margin-bottom:3px;}
+  .obs-warn .ow-text{font-weight:700;font-size:13px;color:#FBE3B0;white-space:pre-wrap;overflow-wrap:anywhere;}
+  #ncBanner .obs-warn{margin:0 0 14px;}
   .sig-img{display:block;margin-top:8px;max-height:64px;max-width:100%;background:var(--surface-3);border:1px solid var(--line);border-radius:6px;padding:4px 8px;}
 
 
@@ -193,6 +197,7 @@
   .badge.warn2{background:var(--amber-dim);color:#F0C374;}
   .badge.warn1{background:var(--orange-dim);color:#F0A876;}
   .badge.bad{background:var(--red-dim);color:#F3B0AC;}
+  .badge.pend{background:var(--surface-3);color:var(--ink-dim);}
   .ext-meta{font-size:11px;color:var(--ink-faint);margin-top:6px;}
   .used-banner{
     background:var(--red-dim);border:1px solid #5C2822;border-radius:8px;
@@ -662,7 +667,7 @@
     // Solo se muestran los motivos que corresponden a la gravedad final (evita mostrar
     // un motivo leve cuando el estado real del extintor es más grave por otra causa).
     const topReasons = reasons.filter(r => r.level === level).map(r => r.text);
-    return { level, reasons: topReasons, inspectionMissing, ncItems, ncObs: (insp && insp.hasIssues) ? (insp.obs||'') : '' };
+    return { level, reasons: topReasons, inspectionMissing, ncItems, lastObs: insp ? (insp.obs||'').trim() : '' };
   }
 
   // ---------- rendering ----------
@@ -718,12 +723,16 @@
   // Contenido de la tarjeta de cada extintor en la vista Inicio (por KM).
   // Lista en negrita las no conformidades de la última inspección (y su observación), para saber qué corregir.
   function ncBoxHtml(status){
-    if(!status.ncItems.length) return '';
-    return `<div class="nc-box">
+    const nc = status.ncItems.length ? `<div class="nc-box">
       <span class="nc-title">No conformidades por corregir</span>
       <ul class="nc-list">${status.ncItems.map(i=>`<li>${escapeHtml(i)}</li>`).join('')}</ul>
-      ${status.ncObs ? `<div class="nc-obs">Observación: ${obsHtml(status.ncObs)}</div>` : ''}
-    </div>`;
+    </div>` : '';
+    // Observación de la última inspección: cuadro amarillo de advertencia, texto en negrita.
+    const warn = status.lastObs ? `<div class="obs-warn" role="note">
+      <span class="ow-title">⚠ Observación de la última inspección</span>
+      <span class="ow-text">${escapeHtml(status.lastObs)}</span>
+    </div>` : '';
+    return nc + warn;
   }
 
   function extSummaryHtml(ext){
@@ -738,7 +747,7 @@
           ${ext.ubicacion ? `<div class="ext-loc">${escapeHtml(ext.ubicacion)}</div>` : ''}
           <div class="ext-type">${escapeHtml(ext.tipo||'')} · ${escapeHtml(ext.capacidad||'—')}</div>
         </div>
-        <span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>
+        ${(status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>`}
       </div>
       <div class="ext-meta">Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
       ${shownReasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(shownReasons.join('; '))}</div>` : ''}
@@ -1187,7 +1196,7 @@
       .filter(i=> byId[i.extId] && (sel.round || dateOnly(i.date).slice(0,7) === sel.month))
       .sort((a,b)=> extOrder(byId[a.extId], byId[b.extId]) || dateOnly(a.date).localeCompare(dateOnly(b.date)));
     const sigs = [];
-    for(const i of insps) sigs.push(await signatureForPdf(i.signature));
+    if(sel.round) for(const i of insps) sigs.push(await signatureForPdf(i.signature));
 
     const latest = {};
     insps.forEach(i=>{ const cur = latest[i.extId]; if(!cur || dateOnly(i.date) >= dateOnly(cur.date)) latest[i.extId] = i; });
@@ -1261,18 +1270,22 @@
       y += 5;
     }
 
-    // Detalle
-    y = ensureSpace(doc, y, 14);
-    pdfFont(doc,'bold',11,INK); doc.text(pdfSafe(`Detalle de inspecciones (${insps.length})`), PG.M, y); y += 6;
-    if(!insps.length){
-      pdfFont(doc,'normal',9,MUTED); doc.text(`No hay inspecciones registradas ${scopeTxt}.`, PG.M, y + 1);
+    // Detalle por extintor (con firmas): solo en el informe de inspección de un KM; el reporte de Registros es un resumen.
+    if(sel.round){
+      y = ensureSpace(doc, y, 14);
+      pdfFont(doc,'bold',11,INK); doc.text(pdfSafe(`Detalle de inspecciones (${insps.length})`), PG.M, y); y += 6;
+      if(!insps.length){
+        pdfFont(doc,'normal',9,MUTED); doc.text(`No hay inspecciones registradas ${scopeTxt}.`, PG.M, y + 1);
+      }
+      insps.forEach((insp, idx)=>{
+        const blk = { ext: byId[insp.extId], insp, sig: sigs[idx] };
+        const h = drawInspectionBlock(doc, y, blk, true) - y;
+        y = ensureSpace(doc, y, h);
+        y = drawInspectionBlock(doc, y, blk, false);
+      });
+
+
     }
-    insps.forEach((insp, idx)=>{
-      const blk = { ext: byId[insp.extId], insp, sig: sigs[idx] };
-      const h = drawInspectionBlock(doc, y, blk, true) - y;
-      y = ensureSpace(doc, y, h);
-      y = drawInspectionBlock(doc, y, blk, false);
-    });
 
     drawFooters(doc, `Generado: ${nowStamp()}`);
     return { doc, filename: sel.round
@@ -1322,7 +1335,7 @@
         <label>Año<select id="pdfYear">${years.map(y=>`<option value="${y}"${sel.year===y?' selected':''}>${y}</option>`).join('')}</select></label>
         <button class="btn primary" id="pdfGen" type="button">Generar PDF</button>
       </div>
-      <div class="rep-note" style="margin-top:10px;">Incluye un resumen por KM, los extintores sin inspección del mes y el detalle de cada inspección con la firma del inspector. También puede descargar el PDF de una sola inspección desde el Historial de cada extintor.</div>
+      <div class="rep-note" style="margin-top:10px;">Incluye el resumen por KM, los extintores sin inspección del mes y los inspectores con su cantidad de inspecciones. El informe con el detalle y las firmas de cada extintor se genera por KM al completar su inspección (Inicio), y el PDF de una sola inspección está en el Historial de cada extintor.</div>
     </div>`;
   }
   function bindPdfPanel(){
