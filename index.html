@@ -800,7 +800,7 @@
           <div class="ext-code">${escapeHtml(ext.code||'(sin código)')}</div>
           ${ext.ubicacion ? `<div class="ext-loc">${escapeHtml(ext.ubicacion)}</div>` : ''}
           <div class="ext-type">${escapeHtml(ext.tipo||'')} · ${escapeHtml(ext.capacidad||'—')}</div>
-          ${ext.vencimiento ? `<div class="rec-box">Fecha de recarga: ${fmtDMY(addYearsISO(dateOnly(ext.vencimiento), -RECHARGE_CYCLE_YEARS))}<br>Vence: ${fmtDMY(dateOnly(ext.vencimiento))}</div>` : ''}
+          ${ext.vencimiento ? `<div class="rec-box">Vence: ${fmtFull(dateOnly(ext.vencimiento))}</div>` : ''}
         </div>
         ${status.enRecarga ? `<span class="badge rcb">EN RECARGA</span>` : (status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>`}
       </div>
@@ -833,6 +833,11 @@
     };
   }
 
+  // "23 de octubre del 2026"
+  function fmtFull(iso){
+    const p = (iso||'').split('-').map(Number);
+    return p.length === 3 && p[0] ? `${p[2]} de ${MONTH_NAMES[p[1]-1]} del ${p[0]}` : '';
+  }
   function fmtLong(iso){
     const [y,m,d] = iso.split('-').map(Number);
     return new Date(y, m-1, d, 12).toLocaleDateString('es-GT',{day:'numeric',month:'long'});
