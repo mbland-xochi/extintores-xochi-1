@@ -212,7 +212,11 @@
   .badge.warn2{background:var(--amber-dim);color:#F0C374;}
   .badge.warn1{background:var(--orange-dim);color:#F0A876;}
   .badge.bad{background:var(--red-dim);color:#F3B0AC;}
-  .badge.pend{background:var(--surface-3);color:var(--ink-dim);}
+  .badge.pend{background:var(--red-dim);color:#F3B0AC;}
+  .badge.rcb{background:var(--surface-3);color:var(--ink-dim);}
+  .ext-pend{margin-top:6px;font-weight:700;font-size:13px;color:#F3736C;letter-spacing:.03em;}
+  .rec-box{display:inline-block;margin-top:7px;padding:6px 10px;border:1px solid var(--ink-faint);border-radius:6px;background:var(--surface-3);font-weight:700;font-size:13px;color:var(--ink);line-height:1.5;}
+  .ext-card.warn1 .rec-box{background:rgba(0,0,0,.28);border-color:var(--amber);}
   .ext-meta{font-size:11px;color:var(--ink-faint);margin-top:6px;}
   .used-banner{
     background:var(--red-dim);border:1px solid #5C2822;border-radius:8px;
@@ -796,15 +800,16 @@
           <div class="ext-code">${escapeHtml(ext.code||'(sin código)')}</div>
           ${ext.ubicacion ? `<div class="ext-loc">${escapeHtml(ext.ubicacion)}</div>` : ''}
           <div class="ext-type">${escapeHtml(ext.tipo||'')} · ${escapeHtml(ext.capacidad||'—')}</div>
+          ${ext.vencimiento ? `<div class="rec-box">Fecha de recarga: ${fmtDMY(addYearsISO(dateOnly(ext.vencimiento), -RECHARGE_CYCLE_YEARS))}<br>Vence: ${fmtDMY(dateOnly(ext.vencimiento))}</div>` : ''}
         </div>
-        ${status.enRecarga ? `<span class="badge pend">EN RECARGA</span>` : (status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>`}
+        ${status.enRecarga ? `<span class="badge rcb">EN RECARGA</span>` : (status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>`}
       </div>
       <div class="ext-meta">Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
       ${shownReasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(shownReasons.join('; '))}</div>` : ''}
       ${status.enRecarga ? `<div class="ext-warn">Recarga en proceso desde el ${fmtDMY(status.enRecarga)}</div>` : ''}
       ${status.recargaDue ? `<div class="ext-warn">⚠ Recarga vence el ${fmtDMY(status.recargaDue)}</div>` : ''}
       ${ncBoxHtml(status)}
-      ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección pendiente (cada 30 días)</div>` : ''}
+      ${status.inspectionMissing ? `<div class="ext-pend">PENDIENTE de inspección (cada 30 días)</div>` : ''}
     `;
   }
 
