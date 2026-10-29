@@ -155,6 +155,21 @@
 
   /* observaciones siempre en negrita */
   .obs{font-weight:700;color:var(--ink);}
+  .ext-card.warn1{background:var(--amber-dim);border-color:var(--amber);}
+  .ext-card.warn1 .obs-warn{background:rgba(0,0,0,.28);}
+  .ext-warn{margin-top:6px;font-weight:700;font-size:13px;color:#F0C374;}
+  #mRecarga{font-weight:700;}
+  .rc-status{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--ink-dim);margin-bottom:12px;line-height:1.5;}
+  .rc-status strong{color:var(--ink);}
+  .rc-status.open{border-color:var(--amber);background:var(--amber-dim);color:#F0C374;}
+  .rc-actions{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .rc-actions .btn{flex:1;min-width:150px;}
+  .rc-actions .btn[disabled]{opacity:.4;cursor:not-allowed;}
+  .rc-form{border-top:1px solid var(--line);padding-top:14px;margin-top:4px;}
+  .rc-form-btns{display:flex;gap:10px;}
+  .rc-total{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-weight:700;font-size:14px;min-height:42px;}
+  .rc-sub{font-size:12.5px;color:var(--ink-dim);margin:6px 0 2px;}
+  .recarga-hint{font-size:12px;color:var(--ink-faint);margin-top:4px;line-height:1.5;}
   .obs-warn{margin-top:7px;padding:8px 10px;border-left:3px solid var(--amber);background:var(--amber-dim);border-radius:0 6px 6px 0;}
   .obs-warn .ow-title{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#F0C374;margin-bottom:3px;}
   .obs-warn .ow-text{font-weight:700;font-size:13px;color:#FBE3B0;white-space:pre-wrap;overflow-wrap:anywhere;}
@@ -313,7 +328,7 @@
   <header class="top">
     <div class="title-block">
       <h1>Extintores <span>·</span> Xochi</h1>
-      <div class="sub">CA-2 KM142–KM173 · Inspección mensual y mantenimiento anual</div>
+      <div class="sub">CA-2 KM142–KM173 · Inspección mensual y recarga anual</div>
     </div>
     <div class="route-strip" id="routeStrip"></div>
   </header>
@@ -352,7 +367,7 @@
     <div id="ncBanner"></div>
     <div class="tabs">
       <div class="tab active" data-tab="monthly">Inspección mensual</div>
-      <div class="tab" data-tab="annual">Mantenimiento anual</div>
+      <div class="tab" data-tab="annual">Recarga anual</div>
       <div class="tab" data-tab="history">Historial</div>
       <div class="tab" data-tab="info">Datos</div>
     </div>
@@ -360,6 +375,7 @@
     <div class="tabpage active" id="tab-monthly">
       <div class="field"><label>Nombre del inspector (obligatorio)</label><input type="text" id="mInspector" list="peopleNames" autocomplete="off" placeholder="Nombre y apellido"></div>
       <div class="field"><label>Fecha</label><input type="date" id="mDate"></div>
+      <div class="field"><label>Fecha de recarga</label><input type="date" id="mRecarga"><div class="recarga-hint" id="mRecargaHint"></div></div>
       <div id="checklistItems"></div>
       <div class="field" style="margin-top:14px;"><label>Observaciones</label><textarea id="mObs" placeholder="Detalle de no conformidades, si aplica"></textarea></div>
       <div class="field">
@@ -371,31 +387,35 @@
     </div>
 
     <div class="tabpage" id="tab-annual">
-      <div class="row2">
-        <div class="field"><label>Fecha de mantenimiento</label><input type="date" id="aDate"></div>
-        <div class="field"><label>Peso verificado (lbs)</label><input type="number" step="0.1" id="aPeso"></div>
+      <div class="rc-status" id="rcStatus"></div>
+      <div class="rc-actions">
+        <button type="button" class="btn primary" id="rcStartBtn">Iniciar recarga</button>
+        <button type="button" class="btn ghost" id="rcEndBtn">Terminar recarga</button>
       </div>
-      <div class="row2">
-        <div class="field"><label>Empresa / técnico certificado (obligatorio)</label><input type="text" id="aTecnico" placeholder="Nombre de empresa o técnico"></div>
-        <div class="field"><label>N.º certificado / orden</label><input type="text" id="aCert"></div>
-      </div>
-      <div class="row2">
-        <div class="field"><label>¿Se realizó recarga?</label>
-          <select id="aRecarga"><option value="no">No</option><option value="si">Sí</option></select>
-        </div>
-        <div class="field"><label>Prueba hidrostática realizada</label>
-          <select id="aHidro"><option value="no">No aplica / No</option><option value="si">Sí</option></select>
+
+      <div class="rc-form" id="rcStartForm" style="display:none;">
+        <div class="field"><label>Fecha de inicio de la recarga</label><input type="date" id="aStartDate"></div>
+        <div class="rc-form-btns">
+          <button type="button" class="btn primary" id="rcStartConfirm">Confirmar inicio</button>
+          <button type="button" class="btn ghost" id="rcStartCancel">Cancelar</button>
         </div>
       </div>
-      <div class="row2">
-        <div class="field"><label>Próxima prueba hidrostática</label><input type="date" id="aProxHidro"></div>
-        <div class="field"><label>Próximo mantenimiento anual</label><input type="date" id="aProxMant"></div>
-      </div>
-      <div class="field"><label>Observaciones</label><textarea id="aObs"></textarea></div>
-      <div class="field">
-        <label>Firma del técnico / responsable (obligatoria)</label>
-        <div class="sig-wrap"><canvas class="sig" id="aSig"></canvas></div>
-        <div class="sig-actions"><span>Dibuje con el dedo o el mouse</span><button class="btn ghost" id="aSigClear" style="padding:4px 10px;font-size:11px;">Limpiar</button></div>
+
+      <div class="rc-form" id="rcEndForm" style="display:none;">
+        <div class="row2">
+          <div class="field"><label>Fecha de término de la recarga</label><input type="date" id="aEndDate"></div>
+          <div class="field"><label>Tiempo total de recarga</label><div class="rc-total" id="rcTotal">—</div></div>
+        </div>
+        <div class="field"><label>Empresa que realizó la recarga (obligatorio)</label><input type="text" id="aEmpresa" placeholder="Nombre de la empresa" autocomplete="off"></div>
+        <div class="field"><label>Nombre del responsable (obligatorio)</label><input type="text" id="aResp" list="peopleNames" autocomplete="off" placeholder="Nombre y apellido"></div>
+        <div class="rc-sub">Estado del extintor tras la recarga</div>
+        <div id="rcChecklist"></div>
+        <div class="field" style="margin-top:14px;"><label>Observaciones</label><textarea id="aObs"></textarea></div>
+        <div class="field">
+          <label>Firma del responsable (obligatoria)</label>
+          <div class="sig-wrap"><canvas class="sig" id="aSig"></canvas></div>
+          <div class="sig-actions"><span>Dibuje con el dedo o el mouse</span><button class="btn ghost" id="aSigClear" style="padding:4px 10px;font-size:11px;">Limpiar</button></div>
+        </div>
       </div>
     </div>
 
@@ -604,7 +624,20 @@
     return !!insp && dateOnly(insp.date) > shiftISO(todayISO(), -INSPECTION_DAYS);
   }
   function lastInspection(extId){ return latestByDate(data.inspections.filter(r=>r.extId===extId)); }
-  function lastMaintenance(extId){ return latestByDate(data.maintenance.filter(r=>r.extId===extId)); }
+  // Mantenimientos anteriores (prueba hidrostática / mantenimiento anual); no incluye las recargas nuevas.
+  function lastMaintenance(extId){ return latestByDate(data.maintenance.filter(r=>r.extId===extId && !r.kind)); }
+  function daysBetweenISO(a, b){
+    const pa = a.split('-').map(Number), pb = b.split('-').map(Number);
+    return Math.round((new Date(pb[0], pb[1]-1, pb[2], 12) - new Date(pa[0], pa[1]-1, pa[2], 12)) / DAY);
+  }
+  function fmtDuration(n){ return n <= 0 ? 'Mismo día' : (n === 1 ? '1 día' : n + ' días'); }
+  // Recarga en proceso: el último registro de recarga del extintor es un "inicio" sin su "término".
+  function openRecharge(extId){
+    const list = data.maintenance.filter(r=>r.extId===extId && (r.kind==='recarga_inicio' || r.kind==='recarga_fin'));
+    const last = latestByDate(list);
+    return (last && last.kind === 'recarga_inicio') ? last : null;
+  }
+  function lastRechargeEnd(extId){ return latestByDate(data.maintenance.filter(r=>r.extId===extId && r.kind==='recarga_fin')); }
 
   // Capacidad: si solo escriben un número, se guarda en lbs.
   function normCap(v){
@@ -637,6 +670,11 @@
     if(ext.usado){
       bump('bad', 'Descarga reportada — requiere recarga inmediata');
     }
+    let recargaDue = '';
+    if(ext.vencimiento){
+      const dd = Math.floor((new Date(ext.vencimiento) - now)/DAY);
+      if(dd >= 0 && dd <= 60) recargaDue = dateOnly(ext.vencimiento);
+    }
     checkDate(ext.vencimiento,
       'Vencimiento de recarga: fecha vencida',
       'Vencimiento de recarga: vence en menos de 1 mes',
@@ -656,10 +694,17 @@
 
     const insp = lastInspection(ext.id);
     let ncItems = [];
-    if(insp && insp.hasIssues){
+    // No conformidades del estado tras la recarga, mientras no haya una inspección posterior.
+    const rfin = lastRechargeEnd(ext.id);
+    const rfinOpen = !!(rfin && rfin.hasIssues && (!insp || dateOnly(insp.date) < dateOnly(rfin.date)));
+    if(rfinOpen){
+      bump('bad', 'No conformidad en el estado tras la recarga');
+      ncItems = (rfin.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label);
+    } else if(insp && insp.hasIssues){
       bump('bad', 'No conformidad en última inspección mensual');
       ncItems = (insp.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label);
     }
+    const enRecarga = openRecharge(ext.id);
 
     // Frecuencia mensual: pendiente si la última inspección tiene 30 días o más (o no existe).
     const inspectionMissing = !insp || !isCurrentInspection(insp);
@@ -667,7 +712,7 @@
     // Solo se muestran los motivos que corresponden a la gravedad final (evita mostrar
     // un motivo leve cuando el estado real del extintor es más grave por otra causa).
     const topReasons = reasons.filter(r => r.level === level).map(r => r.text);
-    return { level, reasons: topReasons, inspectionMissing, ncItems, lastObs: insp ? (insp.obs||'').trim() : '' };
+    return { level, reasons: topReasons, inspectionMissing, ncItems, recargaDue, enRecarga: enRecarga ? dateOnly(enRecarga.date) : '', lastObs: insp ? (insp.obs||'').trim() : '' };
   }
 
   // ---------- rendering ----------
@@ -675,9 +720,14 @@
     const el = $("#routeStrip"); el.innerHTML = "";
     LOCATIONS.forEach(loc=>{
       const exts = data.extinguishers.filter(e=>e.location===loc);
-      let worst = "ok";
-      exts.forEach(e=>{ const s = extStatus(e).level; if(LEVEL_ORDER[s] > LEVEL_ORDER[worst]) worst = s; });
-      const dotClass = exts.length ? worst : "";
+      // Rojo: algún extintor con no conformidad, pendiente de inspección (o vencido/descargado).
+      // Amarillo: algún extintor próximo a vencer. Verde: todos conformes y sin vencimiento próximo.
+      let dotClass = exts.length ? "ok" : "";
+      exts.forEach(e=>{
+        const st = extStatus(e);
+        if(st.level === 'bad' || st.inspectionMissing) dotClass = "bad";
+        else if(dotClass !== "bad" && (st.level === 'warn1' || st.level === 'warn2' || st.recargaDue)) dotClass = "warn2";
+      });
       const div = document.createElement('div');
       div.className = "km" + (loc===activeLocation ? " active":"");
       div.innerHTML = `<span class="dot ${dotClass}"></span>${loc}`;
@@ -747,10 +797,12 @@
           ${ext.ubicacion ? `<div class="ext-loc">${escapeHtml(ext.ubicacion)}</div>` : ''}
           <div class="ext-type">${escapeHtml(ext.tipo||'')} · ${escapeHtml(ext.capacidad||'—')}</div>
         </div>
-        ${(status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>`}
+        ${status.enRecarga ? `<span class="badge pend">EN RECARGA</span>` : (status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>`}
       </div>
       <div class="ext-meta">Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
       ${shownReasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(shownReasons.join('; '))}</div>` : ''}
+      ${status.enRecarga ? `<div class="ext-warn">Recarga en proceso desde el ${fmtDMY(status.enRecarga)}</div>` : ''}
+      ${status.recargaDue ? `<div class="ext-warn">⚠ Recarga vence el ${fmtDMY(status.recargaDue)}</div>` : ''}
       ${ncBoxHtml(status)}
       ${status.inspectionMissing ? `<div class="ext-meta" style="margin-top:2px;">Inspección pendiente (cada 30 días)</div>` : ''}
     `;
@@ -830,7 +882,7 @@
       } else {
         exts.forEach(ext=>{
           const card = document.createElement('div');
-          card.className = "ext-card";
+          card.className = "ext-card" + (extStatus(ext).recargaDue ? " warn1" : "");
           card.innerHTML = extSummaryHtml(ext);
           card.onclick = ()=> openPanel(ext.id);
           wrap.appendChild(card);
@@ -882,7 +934,7 @@
   function buildUsage(){
     const rows = [];
     data.inspections.forEach(r=> rows.push({date:dateOnly(r.date), name:r.inspector, kind:'insp'}));
-    data.maintenance.forEach(r=> rows.push({date:dateOnly(r.date), name:r.tecnico, kind:'mant'}));
+    data.maintenance.filter(r=>r.kind !== 'recarga_inicio').forEach(r=> rows.push({date:dateOnly(r.date), name:r.tecnico, kind:'mant'}));
     (data.usageReports||[]).forEach(r=> rows.push({date:dateOnly(r.date), name:r.reporter, kind:'uso'}));
     const valid = rows.filter(r=>r.date);
 
@@ -946,7 +998,7 @@
 
       <div class="rep-scroll">${
         people.length ? `<table class="rep">
-          <thead><tr><th>Persona</th><th class="num">Inspecciones</th><th class="num">Mantenimientos</th><th class="num">Descargas reportadas</th><th class="num">Total</th></tr></thead>
+          <thead><tr><th>Persona</th><th class="num">Inspecciones</th><th class="num">Recargas</th><th class="num">Descargas reportadas</th><th class="num">Total</th></tr></thead>
           <tbody>${people.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td class="num">${p.insp}</td><td class="num">${p.mant}</td><td class="num">${p.uso}</td><td class="num total">${p.total}</td></tr>`).join('')}</tbody>
         </table>` : `<div class="rep-empty">Sin registros en esta semana.</div>`}
       </div>
@@ -957,7 +1009,7 @@
         <tbody>${hist.map(wk=>`<tr class="clickable ${wk===reportWeek?'sel':''}" data-week="${wk}"><td>${weekLabel(wk)}${wk===thisWeek?' · actual':''}</td><td class="num">${weekPeople(usage,wk).length}</td><td class="num total">${weekTotal(usage,wk)}</td></tr>`).join('')}</tbody>
       </table></div>
 
-      <div class="rep-note">Cuenta los registros guardados con nombre: inspecciones mensuales (inspector), mantenimientos anuales (técnico) y descargas reportadas (quien reporta). Semana de lunes a domingo, según la fecha del registro. Las diferencias de mayúsculas, tildes o espacios en un nombre se agrupan como la misma persona.</div>`;
+      <div class="rep-note">Cuenta los registros guardados con nombre: inspecciones mensuales (inspector), recargas terminadas (responsable) y descargas reportadas (quien reporta). Semana de lunes a domingo, según la fecha del registro. Las diferencias de mayúsculas, tildes o espacios en un nombre se agrupan como la misma persona.</div>`;
 
     $("#repPrev").onclick = ()=>{ reportWeek = shiftISO(reportWeek, -7); renderReporte(); };
     $("#repNext").onclick = ()=>{ if(reportWeek < thisWeek){ reportWeek = shiftISO(reportWeek, 7); renderReporte(); } };
@@ -969,7 +1021,7 @@
 
   function downloadUsageCsv(usage){
     const q = v => '"' + String(v).replace(/"/g,'""') + '"';
-    const lines = [['Semana (lunes)','Semana (domingo)','Persona','Inspecciones','Mantenimientos','Descargas reportadas','Total'].map(q).join(',')];
+    const lines = [['Semana (lunes)','Semana (domingo)','Persona','Inspecciones','Recargas','Descargas reportadas','Total'].map(q).join(',')];
     Object.keys(usage.weeks).sort().reverse().forEach(wk=>{
       weekPeople(usage, wk).forEach(p=> lines.push([wk, shiftISO(wk,6), p.name, p.insp, p.mant, p.uso, p.total].map(q).join(',')));
     });
@@ -1411,23 +1463,21 @@
     // monthly tab defaults
     $("#mInspector").value = "";
     $("#mDate").value = todayISO();
+    panelRecargaDefault = ext.vencimiento ? addYearsISO(dateOnly(ext.vencimiento), -RECHARGE_CYCLE_YEARS) : "";
+    $("#mRecarga").value = panelRecargaDefault;
+    updateRecargaHint();
     $("#mObs").value = "";
     $("#autoPdf").checked = getAutoPdf();
     renderChecklist();
     clearSig('mSig');
 
-    // annual tab defaults
-    const maint = lastMaintenance(extId);
-    $("#aDate").value = todayISO();
-    $("#aPeso").value = maint ? (maint.peso||"") : "";
-    $("#aTecnico").value = "";
-    $("#aCert").value = "";
-    $("#aRecarga").value = "no";
-    $("#aHidro").value = "no";
-    $("#aProxHidro").value = maint ? (maint.proxHidro||"") : "";
-    $("#aProxMant").value = maint ? (maint.proxMant||"") : "";
+    // recarga tab defaults
+    $("#aEmpresa").value = "";
+    $("#aResp").value = "";
     $("#aObs").value = "";
     clearSig('aSig');
+    renderRcChecklist();
+    showRecharge(null);
 
     // info tab
     $("#iTipo").value = ext.tipo || "PQS";
@@ -1509,16 +1559,17 @@
   function switchTab(name){
     $$('.tab').forEach(t=> t.classList.toggle('active', t.dataset.tab===name));
     $$('.tabpage').forEach(p=> p.classList.toggle('active', p.id==='tab-'+name));
-    $("#saveActive").style.display = (name==='history') ? 'none' : 'inline-block';
-    $("#saveActive").textContent = name==='annual' ? 'Guardar mantenimiento' : name==='info' ? 'Guardar datos' : 'Guardar inspección';
+    const endOpen = $("#rcEndForm").style.display !== 'none';
+    $("#saveActive").style.display = (name==='history' || (name==='annual' && !endOpen)) ? 'none' : 'inline-block';
+    $("#saveActive").textContent = name==='annual' ? 'Guardar recarga' : name==='info' ? 'Guardar datos' : 'Guardar inspección';
     setTimeout(setupSignaturePads, 30);
   }
   $$('.tab').forEach(t=> t.onclick = ()=> switchTab(t.dataset.tab));
   $("#autoPdf").onchange = ()=> setAutoPdf($("#autoPdf").checked);
 
-  function renderChecklist(){
-    const root = $("#checklistItems"); root.innerHTML = "";
-    CHECKLIST_DEFS.forEach(([key,label])=>{
+  function renderChecklistInto(rootSel, defs){
+    const root = $(rootSel); root.innerHTML = "";
+    defs.forEach(([key,label])=>{
       const row = document.createElement('div');
       row.className = "checklist-item";
       row.dataset.key = key;
@@ -1530,7 +1581,7 @@
         </div>`;
       root.appendChild(row);
     });
-    $$('#checklistItems .seg button').forEach(btn=>{
+    $$(rootSel + ' .seg button').forEach(btn=>{
       btn.onclick = ()=>{
         const seg = btn.parentElement;
         $$('button', seg).forEach(b=>b.classList.remove('active'));
@@ -1538,13 +1589,20 @@
       };
     });
   }
+  function renderChecklist(){ renderChecklistInto('#checklistItems', CHECKLIST_DEFS); }
+  // Estado del extintor tras la recarga: manómetro, pasador/precinto, manguera y cuerpo.
+  const RC_KEYS = ['presion','pasador','manguera','cuerpo'];
+  function renderRcChecklist(){ renderChecklistInto('#rcChecklist', CHECKLIST_DEFS.filter(d=>RC_KEYS.indexOf(d[0]) > -1)); }
 
   function renderHistory(extId){
     const root = $("#historyList");
     const extObj = data.extinguishers.find(e=>e.id===extId);
-    const inspections = data.inspections.filter(r=>r.extId===extId).map(r=>({...r,kind:'Inspección mensual'}));
-    const maints = data.maintenance.filter(r=>r.extId===extId).map(r=>({...r,kind:'Mantenimiento anual'}));
-    const all = inspections.concat(maints).sort((a,b)=>b.date.localeCompare(a.date));
+    const inspections = data.inspections.filter(r=>r.extId===extId).map(r=>({...r, rkind:'insp', label:'Inspección mensual'}));
+    const maints = data.maintenance.filter(r=>r.extId===extId).map(r=>({...r,
+      rkind: r.kind === 'recarga_inicio' ? 'rc_ini' : r.kind === 'recarga_fin' ? 'rc_fin' : 'mant',
+      label: r.kind === 'recarga_inicio' ? 'Recarga iniciada' : r.kind === 'recarga_fin' ? 'Recarga terminada' : 'Mantenimiento anual' }));
+    const all = inspections.concat(maints).map((r,i)=>({r,i}))
+      .sort((a,b)=> dateOnly(b.r.date).localeCompare(dateOnly(a.r.date)) || b.i - a.i).map(x=>x.r);
     root.innerHTML = "";
     if(all.length===0){
       root.innerHTML = `<div class="hist-empty">Aún no hay registros para este extintor.</div>`;
@@ -1554,17 +1612,23 @@
       const div = document.createElement('div');
       div.className = "hist-item";
       let issuesHtml = "";
-      if(r.kind==='Inspección mensual' && r.hasIssues){
+      if((r.rkind==='insp' || r.rkind==='rc_fin') && r.hasIssues){
         const bad = (r.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label);
         issuesHtml = `<div class="issues">No conforme: ${bad.join(', ')}</div>`;
       }
+      let rcHtml = "";
+      if(r.rkind==='rc_fin'){
+        const dias = (r.dias === '' || r.dias == null) ? (r.fechaInicio ? daysBetweenISO(dateOnly(r.fechaInicio), dateOnly(r.date)) : null) : Number(r.dias);
+        rcHtml = `<div style="font-size:12.5px;margin-top:4px;">${r.fechaInicio ? 'Inicio: ' + fmtDate(r.fechaInicio) + ' · ' : ''}<strong>Tiempo total de recarga: ${dias == null ? '—' : fmtDuration(dias)}</strong>${r.empresa ? ' · Empresa: ' + escapeHtml(r.empresa) : ''}</div>`;
+      }
       div.innerHTML = `
-        <div class="hh"><span>${r.kind} · ${fmtDate(r.date)}</span><span class="who">${escapeHtml(r.inspector||r.tecnico||'')}</span></div>
+        <div class="hh"><span>${r.label} · ${fmtDate(r.date)}</span><span class="who">${escapeHtml(r.inspector||r.tecnico||'')}</span></div>
+        ${rcHtml}
         ${issuesHtml}
         ${r.obs? `<div style="font-size:12.5px;margin-top:4px;">${obsHtml(r.obs)}</div>`:''}
         ${typeof r.signature==='string' && /^data:image\/png;base64,[A-Za-z0-9+\/=]+$/.test(r.signature) ? `<img class="sig-img" alt="Firma" src="${r.signature}">` : ''}
       `;
-      if(r.kind === 'Inspección mensual' && extObj){
+      if(r.rkind === 'insp' && extObj){
         const pb = document.createElement('button');
         pb.type = 'button'; pb.className = 'btn ghost hist-pdf'; pb.textContent = 'Descargar PDF';
         pb.onclick = (ev)=>{ ev.stopPropagation(); runPdf(pb, ()=>makeInspectionPdf(extObj, r)); };
@@ -1645,9 +1709,20 @@
   $("#saveActive").onclick = async ()=>{
     const active = $$('.tab').find(t=>t.classList.contains('active')).dataset.tab;
     if(active==='monthly') await saveMonthly();
-    else if(active==='annual') await saveAnnual();
+    else if(active==='annual') await saveRechargeEnd();
     else if(active==='info') await saveInfo();
   };
+
+  // Fecha de recarga: se escribe una sola vez; queda guardada (vencimiento = recarga + 1 año)
+  // y aparece como valor predeterminado en las siguientes inspecciones.
+  let panelRecargaDefault = "";
+  function updateRecargaHint(){
+    const v = $("#mRecarga").value;
+    $("#mRecargaHint").textContent = v
+      ? `Recarga anual: vence el ${fmtDMY(addYearsISO(v, RECHARGE_CYCLE_YEARS))}. Queda guardada para las próximas inspecciones.`
+      : "Escríbala una sola vez; queda guardada para las próximas inspecciones.";
+  }
+  $("#mRecarga").oninput = updateRecargaHint;
 
   async function saveMonthly(){
     if(!$("#mInspector").value.trim()){ toast("El nombre del inspector es obligatorio."); $("#mInspector").focus(); return; }
@@ -1663,6 +1738,12 @@
       obs: $("#mObs").value.trim(), signature: sigDataUrl('mSig')
     };
     const extSaved = data.extinguishers.find(e=>e.id===record.extId);
+    const recargaNueva = $("#mRecarga").value;
+    let nuevoVenc = null;
+    if(extSaved && recargaNueva && recargaNueva !== panelRecargaDefault){
+      nuevoVenc = addYearsISO(recargaNueva, RECHARGE_CYCLE_YEARS);
+      extSaved.vencimiento = nuevoVenc;
+    }
     const locSaved = extSaved ? extSaved.location : null;
     const before = locSaved ? roundInfo(locSaved) : null;
     data.inspections.push(record);
@@ -1682,42 +1763,111 @@
     }
     const res = await apiPost('addInspection', record);
     if(!res.ok) toast("No se pudo sincronizar la inspección con la base de datos.");
+    if(nuevoVenc){
+      const r2 = await apiPost('updateExt', {
+        id: extSaved.id, tipo: extSaved.tipo, capacidad: extSaved.capacidad,
+        fabricacion: extSaved.fabricacion, vencimiento: nuevoVenc, ubicacion: extSaved.ubicacion
+      });
+      if(!r2.ok) toast("No se pudo sincronizar la fecha de recarga con la base de datos.");
+    }
   }
 
-  async function saveAnnual(){
-    if(!$("#aTecnico").value.trim()){ toast("El nombre del técnico o empresa es obligatorio."); $("#aTecnico").focus(); return; }
-    if(!hasSignature('aSig')){ toast("La firma del técnico / responsable es obligatoria."); return; }
-    const recarga = $("#aRecarga").value;
-    const maintDate = $("#aDate").value || todayISO();
-    const record = {
-      id: uid(), extId: activeExtId, date: maintDate,
-      peso: $("#aPeso").value, tecnico: $("#aTecnico").value.trim(), cert: $("#aCert").value.trim(),
-      recarga, hidro: $("#aHidro").value,
-      proxHidro: $("#aProxHidro").value, proxMant: $("#aProxMant").value,
+  // ---------- recarga anual: iniciar / terminar ----------
+  function blankMaint(extra){
+    return Object.assign({ id: uid(), extId: activeExtId, date: todayISO(), kind:'', fechaInicio:'', dias:'', empresa:'',
+      checklist:[], hasIssues:false, peso:'', tecnico:'', cert:'', recarga:'', hidro:'', proxHidro:'', proxMant:'', obs:'', signature:'' }, extra);
+  }
+
+  // Muestra el estado de la recarga y los formularios: mode = null | 'start' | 'end'
+  function showRecharge(mode){
+    const ext = data.extinguishers.find(e=>e.id===activeExtId);
+    const open = ext ? openRecharge(ext.id) : null;
+    const st = $("#rcStatus");
+    if(open){
+      const d0 = dateOnly(open.date);
+      st.className = "rc-status open";
+      st.innerHTML = `<strong>Recarga en proceso</strong> desde el ${fmtDMY(d0)} (${fmtDuration(Math.max(0, daysBetweenISO(d0, todayISO())))} hasta hoy).`;
+    } else {
+      const last = ext ? lastRechargeEnd(ext.id) : null;
+      st.className = "rc-status";
+      st.innerHTML = last
+        ? `Sin recarga en proceso. Última recarga terminada el <strong>${fmtDMY(dateOnly(last.date))}</strong>${ext && ext.vencimiento ? ` · vence el <strong>${fmtDMY(dateOnly(ext.vencimiento))}</strong>` : ''}.`
+        : `Sin recarga en proceso.${ext && ext.vencimiento ? ` Vencimiento actual: <strong>${fmtDMY(dateOnly(ext.vencimiento))}</strong>.` : ''}`;
+    }
+    $("#rcStartBtn").disabled = !!open;
+    $("#rcEndBtn").disabled = !open;
+    $("#rcEndBtn").title = open ? '' : 'Primero inicie la recarga';
+    $("#rcStartForm").style.display = (mode === 'start' && !open) ? '' : 'none';
+    $("#rcEndForm").style.display = (mode === 'end' && open) ? '' : 'none';
+    if($("#rcStartForm").style.display !== 'none') $("#aStartDate").value = todayISO();
+    if($("#rcEndForm").style.display !== 'none'){
+      $("#aEndDate").value = todayISO();
+      updateRcTotal();
+      clearSig('aSig');
+      renderRcChecklist();
+      setTimeout(setupSignaturePads, 40);
+    }
+    const tab = $$('.tab').find(t=>t.classList.contains('active'));
+    if(tab) switchTab(tab.dataset.tab);
+  }
+  function updateRcTotal(){
+    const open = openRecharge(activeExtId), end = $("#aEndDate").value;
+    if(!open || !end){ $("#rcTotal").textContent = "—"; return; }
+    const n = daysBetweenISO(dateOnly(open.date), end);
+    $("#rcTotal").textContent = n < 0 ? "La fecha de término es anterior al inicio" : fmtDuration(n);
+  }
+  $("#aEndDate").oninput = updateRcTotal;
+  $("#rcStartBtn").onclick = ()=> showRecharge('start');
+  $("#rcEndBtn").onclick = ()=> showRecharge('end');
+  $("#rcStartCancel").onclick = ()=> showRecharge(null);
+
+  $("#rcStartConfirm").onclick = async ()=>{
+    if(openRecharge(activeExtId)){ toast("Ya hay una recarga en proceso para este extintor."); return; }
+    const date = $("#aStartDate").value || todayISO();
+    const record = blankMaint({ kind:'recarga_inicio', date });
+    data.maintenance.push(record);
+    renderAll(); renderHistory(activeExtId); showRecharge(null);
+    toast(`Recarga iniciada el ${fmtDMY(date)}.`);
+    const res = await apiPost('addMaintenance', record);
+    if(!res.ok) toast("No se pudo sincronizar el inicio de recarga con la base de datos.");
+  };
+
+  async function saveRechargeEnd(){
+    const open = openRecharge(activeExtId);
+    if(!open){ toast("Primero inicie la recarga."); return; }
+    const end = $("#aEndDate").value || todayISO();
+    const start = dateOnly(open.date);
+    const dias = daysBetweenISO(start, end);
+    if(dias < 0){ toast("La fecha de término no puede ser anterior al inicio de la recarga."); return; }
+    if(!$("#aEmpresa").value.trim()){ toast("La empresa que realizó la recarga es obligatoria."); $("#aEmpresa").focus(); return; }
+    if(!$("#aResp").value.trim()){ toast("El nombre del responsable es obligatorio."); $("#aResp").focus(); return; }
+    if(!hasSignature('aSig')){ toast("La firma del responsable es obligatoria."); return; }
+    const checklist = $$('#rcChecklist .checklist-item').map(row=>{
+      const active = $('.seg button.active', row);
+      return { key: row.dataset.key, label: row.querySelector('.ci-label').textContent, val: active.dataset.val };
+    });
+    const hasIssues = checklist.some(c=>c.val==='bad');
+    const record = blankMaint({
+      kind:'recarga_fin', date: end, fechaInicio: start, dias, empresa: $("#aEmpresa").value.trim(),
+      tecnico: $("#aResp").value.trim(), checklist, hasIssues, recarga:'si',
       obs: $("#aObs").value.trim(), signature: sigDataUrl('aSig')
-    };
+    });
     data.maintenance.push(record);
     const ext = data.extinguishers.find(e=>e.id===activeExtId);
-    let nuevoVencimiento = null;
-    if(ext && recarga === 'si'){
-      ext.usado = false;
-      nuevoVencimiento = addYearsISO(maintDate, RECHARGE_CYCLE_YEARS);
-      ext.vencimiento = nuevoVencimiento;
-    }
-    renderAll(); renderHistory(activeExtId);
-    if(ext) renderUsedBanner(ext);
+    // Recarga anual: el nuevo vencimiento es la fecha de término + 1 año.
+    const nuevoVencimiento = addYearsISO(end, RECHARGE_CYCLE_YEARS);
+    if(ext){ ext.usado = false; ext.vencimiento = nuevoVencimiento; }
+    closePanel();
+    goHome();
+    toast(`Recarga terminada (${fmtDuration(dias)}). Próximo vencimiento: ${fmtDate(nuevoVencimiento)}.`);
     const res = await apiPost('addMaintenance', record);
-    if(nuevoVencimiento){
+    if(ext){
       await apiPost('updateExt', {
         id: ext.id, tipo: ext.tipo, capacidad: ext.capacidad,
         fabricacion: ext.fabricacion, vencimiento: nuevoVencimiento, ubicacion: ext.ubicacion
       });
     }
-    if(res.ok){
-      toast(recarga==='si'
-        ? `Mantenimiento guardado — recarga registrada, próximo vencimiento: ${fmtDate(nuevoVencimiento)}.`
-        : "Mantenimiento anual guardado.");
-    }
+    if(!res.ok) toast("No se pudo sincronizar la recarga con la base de datos.");
   }
 
   async function saveInfo(){
