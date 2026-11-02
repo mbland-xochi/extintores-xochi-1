@@ -388,8 +388,8 @@
 
     <div class="tabpage active" id="tab-monthly">
       <div class="field"><label>Nombre del inspector (obligatorio)</label><input type="text" id="mInspector" list="peopleNames" autocomplete="off" placeholder="Nombre y apellido"></div>
-      <div class="field"><label>Fecha</label><input type="date" id="mDate"></div>
-      <div class="field"><label>Fecha de recarga</label><input type="date" id="mRecarga"><div class="recarga-hint" id="mRecargaHint"></div></div>
+      <div class="field"><label>Fecha de inspección (hoy)</label><input type="date" id="mDate"></div>
+      <div class="field"><label>Fecha de recarga (vencimiento)</label><input type="date" id="mRecarga"><div class="recarga-hint" id="mRecargaHint"></div></div>
       <div id="checklistItems"></div>
       <div class="field" style="margin-top:14px;"><label>Observaciones</label><textarea id="mObs" placeholder="Detalle de no conformidades, si aplica"></textarea></div>
       <div class="field">
@@ -1491,7 +1491,7 @@
     // monthly tab defaults
     $("#mInspector").value = "";
     $("#mDate").value = todayISO();
-    panelRecargaDefault = ext.vencimiento ? addYearsISO(dateOnly(ext.vencimiento), -RECHARGE_CYCLE_YEARS) : "";
+    panelRecargaDefault = ext.vencimiento ? dateOnly(ext.vencimiento) : "";
     $("#mRecarga").value = panelRecargaDefault;
     updateRecargaHint();
     $("#mObs").value = "";
@@ -1763,8 +1763,8 @@
   function updateRecargaHint(){
     const v = $("#mRecarga").value;
     $("#mRecargaHint").textContent = v
-      ? `Recarga anual: vence el ${fmtDMY(addYearsISO(v, RECHARGE_CYCLE_YEARS))}. Queda guardada para las próximas inspecciones.`
-      : "Escríbala una sola vez; queda guardada para las próximas inspecciones.";
+      ? `Esta es la fecha de vencimiento de la recarga (${fmtFull(v)}) y genera las alertas. Queda guardada para las próximas inspecciones.`
+      : "Escríbala una sola vez; es la fecha de vencimiento de la recarga, genera las alertas y queda guardada.";
   }
   $("#mRecarga").oninput = updateRecargaHint;
 
@@ -1785,7 +1785,7 @@
     const recargaNueva = $("#mRecarga").value;
     let nuevoVenc = null;
     if(extSaved && recargaNueva && recargaNueva !== panelRecargaDefault){
-      nuevoVenc = addYearsISO(recargaNueva, RECHARGE_CYCLE_YEARS);
+      nuevoVenc = recargaNueva;   // la fecha de recarga es la fecha de vencimiento
       extSaved.vencimiento = nuevoVenc;
     }
     const locSaved = extSaved ? extSaved.location : null;
@@ -1797,15 +1797,32 @@
     closePanel();
     goHome();
     const savedMsg = hasIssues ? "Inspección guardada — se registraron no conformidades." : "Inspección guardada.";
-    toast(savedMsg);
+    const kmStarted = !!(before && after && !before.started && after.started && !after.complete);
+    toast(kmStarted ? `${savedMsg} Se inició la inspección de ${locSaved} (${after.done} de ${after.total}).` : savedMsg);
+    const savePromise = apiPost('addInspection', record);
     if(kmCompleted){
-      if(getAutoPdf()){
-        runPdf(null, ()=>makeKmRoundPdf(locSaved), `${savedMsg} ${locSaved}: inspección completa, informe PDF descargado.`, `${savedMsg} ${locSaved}: inspección completa, pero no se pudo generar el PDF. Descárguelo desde Inicio.`);
-      } else {
-        toast(`${savedMsg} ${locSaved}: inspección completa; descargue el informe desde Inicio.`);
-      }
+      (async()=>{
+        let r = null;
+        try{ r = await makeKmRoundPdf(locSaved); }catch(e){ console.error(e); }
+        if(!r) toast(`${savedMsg} ${locSaved}: inspección completa, pero no se pudo generar el PDF. Descárguelo desde Inicio.`);
+        else if(getAutoPdf()){ r.doc.save(r.filename); toast(`${savedMsg} ${locSaved}: inspección completa, informe PDF descargado.`); }
+        else toast(`${savedMsg} ${locSaved}: inspección completa; descargue el informe desde Inicio.`);
+        // Aviso por correo (si el administrador configuró destinatarios en Code.gs), con el informe adjunto.
+        let pdf = '';
+        try{ if(r) pdf = r.doc.output('datauristring').split(',')[1] || ''; }catch(e){ console.error(e); }
+        const nc = after.insps.filter(i=>i.hasIssues).map(i=>{
+          const e = data.extinguishers.find(x=>x.id===i.extId) || {};
+          return { code: e.code || '', items: (i.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label) };
+        });
+        await savePromise;
+        const nres = await apiPost('notifyKmComplete', {
+          loc: locSaved, total: after.total, done: after.done, from: after.from, to: after.to, nc,
+          inspector: record.inspector, filename: r ? r.filename : '', pdf
+        });
+        if(!nres.ok) console.warn('No se pudo enviar el aviso por correo', nres);
+      })();
     }
-    const res = await apiPost('addInspection', record);
+    const res = await savePromise;
     if(!res.ok) toast("No se pudo sincronizar la inspección con la base de datos.");
     if(nuevoVenc){
       const r2 = await apiPost('updateExt', {
