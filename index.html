@@ -97,12 +97,17 @@
   .round-top{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;}
   .round-top .km-name{font-family:'Oswald',system-ui,sans-serif;font-size:15px;letter-spacing:.04em;}
   .round-top .count{color:var(--ink-dim);font-size:12.5px;}
+  .round-stale{margin-top:6px;font-weight:700;font-size:13px;color:#F3736C;}
+  .round-row.stale{border-color:var(--red);}
   .round-bar{height:8px;border-radius:99px;background:var(--surface-3);overflow:hidden;margin-top:8px;}
   .round-bar > span{display:block;height:100%;background:var(--amber);border-radius:99px;transition:width .3s;}
   .round-row.complete .round-bar > span{background:var(--green);}
   .round-row.complete .count{color:var(--green);}
   .round-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;font-size:11.5px;color:var(--ink-faint);}
   .round-foot .btn{padding:5px 10px;font-size:12px;}
+  .rcount{display:inline-block;margin-left:8px;min-width:18px;height:18px;line-height:18px;padding:0 5px;border-radius:9px;background:var(--surface-3);color:var(--ink-dim);font-family:'Inter',system-ui,sans-serif;font-size:11px;font-weight:600;text-align:center;vertical-align:middle;letter-spacing:0;}
+  .round-sel{background:transparent;border:1px solid var(--line);color:var(--ink-dim);border-radius:8px;padding:5px 8px;font:inherit;font-size:12px;cursor:pointer;}
+  .round-sel:hover{color:var(--ink);border-color:var(--ink-faint);}
 
   /* navegación entre vistas */
   .viewnav{display:flex;gap:8px;margin-bottom:18px;}
@@ -835,21 +840,59 @@
   // Una ronda es la inspección de todos los extintores de un KM. Se deriva de los datos compartidos:
   // un extintor está "al día" si su última inspección tiene menos de 30 días; la ronda del KM está
   // completa cuando todos sus extintores están al día y en curso cuando solo algunos lo están.
-  function roundInfo(loc){
+  // Cada inspección guarda fecha y hora de inicio. Las rondas se reconstruyen en orden cronológico:
+  // la ronda empieza con la primera inspección registrada, cada extintor cuenta una vez, y cuando todos
+  // los extintores del KM quedan inspeccionados la ronda se completa. La siguiente inspección (aunque sea
+  // de un solo extintor) empieza una ronda nueva. Una ronda sin completar se descarta a los 30 días.
+  function inspKey(r){ return dateOnly(r.date) + ' ' + (r.hora || '00:00'); }
+  function roundState(loc){
     const exts = data.extinguishers.filter(e=>e.location===loc).sort(extOrder);
-    const insps = [];
-    const pending = [];
-    exts.forEach(e=>{
-      const i = lastInspection(e.id);
-      if(isCurrentInspection(i)) insps.push(i); else pending.push(e);
+    const ids = {}; exts.forEach(e=>{ ids[e.id] = true; });
+    const list = data.inspections.map((r,idx)=>({r,idx})).filter(x=>ids[x.r.extId])
+      .sort((a,b)=> inspKey(a.r).localeCompare(inspKey(b.r)) || a.idx - b.idx).map(x=>x.r);
+    const done = []; let open = null;
+    function snapshot(o, n){
+      const insps = exts.map(e=>o.map[e.id]).filter(Boolean);
+      return { n, insps, count: insps.length, startKey: o.startKey, startDate: o.startDate, startHora: o.startHora,
+               endDate: o.endDate, endHora: o.endHora, from: o.startDate, to: o.endDate };
+    }
+    list.forEach(r=>{
+      const d = dateOnly(r.date);
+      if(open && daysBetweenISO(open.startDate, d) >= INSPECTION_DAYS) open = null;
+      if(!open) open = { startKey: inspKey(r), startDate: d, startHora: r.hora || '', map:{} };
+      open.map[r.extId] = r; open.endDate = d; open.endHora = r.hora || '';
+      if(exts.length && exts.every(e=>open.map[e.id])){ done.push(snapshot(open, done.length + 1)); open = null; }
     });
-    const dates = insps.map(i=>dateOnly(i.date)).sort();
-    return {
-      loc, exts, total: exts.length, done: insps.length, pending, insps,
-      started: insps.length > 0, complete: exts.length > 0 && pending.length === 0,
-      from: dates[0] || '', to: dates[dates.length-1] || ''
-    };
+    return { loc, exts, total: exts.length, done, open: open ? snapshot(open, done.length + 1) : null };
   }
+
+  // Lo que se muestra en Inicio: la ronda en curso o, si no hay, la última ronda completa (dentro de 30 días).
+  function roundInfo(loc){
+    const st = roundState(loc), today = todayISO();
+    const fresh = d => daysBetweenISO(d, today) < INSPECTION_DAYS;
+    const last = st.done[st.done.length - 1];
+    const asDone = snap => ({ ...snap, loc, total: snap.count, done: snap.count, complete: true });
+    const extra = { completed: st.done.length, doneList: st.done.map(asDone) };
+    const prev = last ? asDone(last) : null;
+    // Más de 30 días sin ninguna inspección en el KM: la barra se reinicia (0%) pero el cuadro se mantiene con una alerta.
+    const ids = {}; st.exts.forEach(e=>{ ids[e.id] = true; });
+    const dates = data.inspections.filter(r=>ids[r.extId]).map(r=>dateOnly(r.date)).filter(Boolean).sort();
+    const lastDate = dates[dates.length - 1] || '';
+    if(lastDate && daysBetweenISO(lastDate, today) >= INSPECTION_DAYS){
+      return { loc, exts: st.exts, total: st.total, done: 0, pending: st.exts, insps: [], started: true, complete: false, stale: true,
+               lastDate, staleDays: daysBetweenISO(lastDate, today), from:'', to:'', n: st.done.length + 1, prev, ...extra };
+    }
+    if(st.open && fresh(st.open.startDate)){
+      const covered = {}; st.open.insps.forEach(i=>{ covered[i.extId] = true; });
+      return { ...st.open, loc, exts: st.exts, total: st.total, done: st.open.count, complete: false, started: true,
+               pending: st.exts.filter(e=>!covered[e.id]), prev, ...extra };
+    }
+    if(prev) return { ...prev, exts: st.exts, pending: [], started: true, prev: null, ...extra };
+    return { loc, exts: st.exts, total: st.total, done: 0, pending: st.exts, insps: [], started: false, complete: false, from:'', to:'', n: st.done.length + 1, prev: null, ...extra };
+  }
+  function fmtDT(date, hora){ return fmtDMY(date) + (hora ? ' ' + hora : ''); }
+  function fmtLongDT(date, hora){ return fmtLong(date) + (hora ? ', ' + hora : ''); }
+  function nowHHMM(){ const n = new Date(); return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); }
 
   // "23 de octubre del 2026"
   function fmtFull(iso){
@@ -867,20 +910,35 @@
     if(!list.length || activeView !== 'home'){ root.classList.remove('show'); root.innerHTML = ''; return; }
     root.innerHTML = `<h2>Avance de inspección por KM</h2>` + list.map(r=>{
       const pct = Math.round(r.done / r.total * 100);
-      return `<div class="round-row${r.complete?' complete':''}${r.loc===activeLocation?' active':''}" data-loc="${r.loc}">
-        <div class="round-top"><span class="km-name">${r.loc}</span>
-          <span class="count">${r.complete ? `Inspección completa el ${fmtLong(r.to)} · ` : ''}${r.done} de ${r.total} extintores (${pct}%)</span></div>
+      const prevBtn = (!r.complete && r.prev) ? `<button type="button" class="btn ghost round-pdf" data-loc="${r.loc}" data-prev="1">Informe de la inspección ${r.prev.n}</button>` : '';
+      // Con dos o más inspecciones completas: menú para elegir el reporte original o el actualizado.
+      const reportCtl = r.completed >= 2
+        ? `<select class="round-sel" data-loc="${r.loc}" aria-label="Descargar informe"><option value="">Descargar informe…</option>${r.doneList.map((sn,i)=>`<option value="${i}">${i === 0 ? 'Reporte original' : (i === r.doneList.length - 1 ? 'Reporte actualizado' : 'Reporte ' + sn.n)}</option>`).join('')}</select>`
+        : (r.complete ? `<button type="button" class="btn ghost round-pdf" data-loc="${r.loc}">Descargar informe</button>` : prevBtn);
+      return `<div class="round-row${r.complete?' complete':''}${r.stale?' stale':''}${r.loc===activeLocation?' active':''}" data-loc="${r.loc}">
+        <div class="round-top"><span class="km-name">${r.loc} · Inspección ${r.n}<span class="rcount" title="Inspecciones completadas" aria-label="Inspecciones completadas: ${r.completed}">${r.completed}</span></span>
+          <span class="count">${r.complete ? `Inspección completa el ${fmtLongDT(r.endDate, r.endHora)} · ` : ''}${r.done} de ${r.total} extintores (${pct}%)</span></div>
+        ${r.stale ? `<div class="round-stale">⚠ Más de 30 días sin inspección (última: ${fmtLong(r.lastDate)}, hace ${r.staleDays} días)</div>` : ''}
         <div class="round-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${r.total}" aria-valuenow="${r.done}"><span style="width:${pct}%"></span></div>
-        <div class="round-foot"><span>${r.complete ? 'Informe del KM disponible' : `Faltan ${r.pending.length}`}</span>
-          ${r.complete ? `<button type="button" class="btn ghost round-pdf" data-loc="${r.loc}">Descargar informe</button>` : ''}</div>
+        <div class="round-foot"><span>${r.stale ? `Faltan ${r.pending.length}` : `Iniciada el ${fmtLongDT(r.startDate, r.startHora)}${r.complete ? ' · Informe del KM disponible' : ` · Faltan ${r.pending.length}`}`}</span>
+          ${reportCtl}</div>
       </div>`;
     }).join('');
     root.classList.add('show');
     $$('.round-row', root).forEach(row=> row.onclick = (ev)=>{
-      if(ev.target.closest('.round-pdf')) return;
+      if(ev.target.closest('.round-pdf, .round-sel')) return;
       activeLocation = row.dataset.loc; renderAll();
     });
-    $$('.round-pdf', root).forEach(b=> b.onclick = ()=> runPdf(b, ()=>makeKmRoundPdf(b.dataset.loc)));
+    $$('.round-sel', root).forEach(sel=> sel.onchange = ()=>{
+      const i = sel.value; sel.value = '';
+      if(i === '') return;
+      const snap = roundInfo(sel.dataset.loc).doneList[+i];
+      if(snap) runPdf(null, ()=>makeKmRoundPdf(sel.dataset.loc, snap));
+    });
+    $$('.round-pdf', root).forEach(b=> b.onclick = ()=> runPdf(b, ()=>{
+      const info = roundInfo(b.dataset.loc);
+      return makeKmRoundPdf(b.dataset.loc, b.dataset.prev ? info.prev : info);
+    }));
   }
 
   function renderAreas(){
@@ -1194,7 +1252,7 @@
     pdfWrap(doc, `Tipo: ${ext.tipo||'-'} ${ext.capacidad||''}   |   Ubicación: ${ext.ubicacion||'-'}   |   Vencimiento de recarga: ${fmtDMY(ext.vencimiento)}`, CW)
       .forEach(l=>{ put(l, M, yy + 2.8); yy += LH; });
     pdfFont(doc,'bold',8.5,INK);
-    pdfWrap(doc, `Fecha de inspección: ${fmtDMY(insp.date)}   |   Inspector: ${insp.inspector||'-'}`, CW)
+    pdfWrap(doc, `Fecha de inspección: ${fmtDT(insp.date, insp.hora)}   |   Inspector: ${insp.inspector||'-'}`, CW)
       .forEach(l=>{ put(l, M, yy + 2.8); yy += LH; });
     yy += 2;
 
@@ -1261,7 +1319,7 @@
     const jsPDF = await loadPdfLib();
     const sig = await signatureForPdf(insp.signature);
     const doc = new jsPDF({unit:'mm', format:'a4'});
-    let y = drawReportHeader(doc, 'Informe de inspección mensual de extintor', [`Fecha de inspección: ${fmtDMY(insp.date)}`]);
+    let y = drawReportHeader(doc, 'Informe de inspección mensual de extintor', [`Fecha de inspección: ${fmtDT(insp.date, insp.hora)}`]);
     drawInspectionBlock(doc, y, {ext, insp, sig}, false);
     drawFooters(doc, `Generado: ${nowStamp()}`);
     return { doc, filename: `inspeccion-${safeFile(ext.code)}-${dateOnly(insp.date)}.pdf` };
@@ -1290,8 +1348,9 @@
     const scopeTxt = sel.round ? 'en esta inspección' : 'en este período';
     let y = drawReportHeader(doc, sel.round ? `Informe de inspección de extintores - ${sel.loc}` : 'Reporte de inspecciones mensuales de extintores',
       sel.round ? [
-        `Inspección completa: ${sel.round.done} de ${sel.round.total} extintores`,
-        `Fechas de inspección: ${fmtDMY(sel.round.from)}${sel.round.to !== sel.round.from ? ' al ' + fmtDMY(sel.round.to) : ''}`,
+        `Inspección n.º ${sel.round.n || 1} - completa: ${sel.round.done} de ${sel.round.total} extintores`,
+        `Inicio de la inspección: ${fmtDT(sel.round.startDate || sel.round.from, sel.round.startHora)}`,
+        `Término de la inspección: ${fmtDT(sel.round.endDate || sel.round.to, sel.round.endHora)}`,
         `Ubicación: ${sel.loc}`
       ] : [
         `Período: ${monthLabel(sel.month)}`,
@@ -1369,13 +1428,13 @@
 
     drawFooters(doc, `Generado: ${nowStamp()}`);
     return { doc, filename: sel.round
-      ? `informe-inspeccion-${sel.loc}-${sel.round.to || todayISO()}.pdf`
+      ? `informe-inspeccion-${sel.loc}-${sel.round.to || todayISO()}${sel.round.endHora ? '-' + sel.round.endHora.replace(':','') : ''}.pdf`
       : `reporte-inspecciones-${sel.loc === 'ALL' ? 'todas' : sel.loc}-${sel.month}.pdf` };
   }
 
   // Informe de un KM con su inspección completa: la última inspección vigente (30 días) de cada extintor.
-  function makeKmRoundPdf(loc){
-    return makePeriodPdf({ loc, round: roundInfo(loc) });
+  function makeKmRoundPdf(loc, round){
+    return makePeriodPdf({ loc, round: round || roundInfo(loc) });
   }
 
   // Genera y descarga. okMsg / failMsg permiten personalizar los avisos.
@@ -1491,6 +1550,7 @@
     // monthly tab defaults
     $("#mInspector").value = "";
     $("#mDate").value = todayISO();
+    panelOpenedHora = nowHHMM();
     panelRecargaDefault = ext.vencimiento ? dateOnly(ext.vencimiento) : "";
     $("#mRecarga").value = panelRecargaDefault;
     updateRecargaHint();
@@ -1665,7 +1725,7 @@
         rcHtml = `<div style="font-size:12.5px;margin-top:4px;">${r.fechaInicio ? 'Inicio: ' + fmtDate(r.fechaInicio) + ' · ' : ''}<strong>Tiempo total de recarga: ${dias == null ? '—' : fmtDuration(dias)}</strong>${r.empresa ? ' · Empresa: ' + escapeHtml(r.empresa) : ''}</div>`;
       }
       div.innerHTML = `
-        <div class="hh"><span>${r.label} · ${fmtDate(r.date)}</span><span class="who">${escapeHtml(r.inspector||r.tecnico||'')}</span></div>
+        <div class="hh"><span>${r.label} · ${fmtDate(r.date)}${r.hora ? ' · ' + r.hora : ''}</span><span class="who">${escapeHtml(r.inspector||r.tecnico||'')}</span></div>
         ${rcHtml}
         ${issuesHtml}
         ${r.obs? `<div style="font-size:12.5px;margin-top:4px;">${obsHtml(r.obs)}</div>`:''}
@@ -1760,6 +1820,7 @@
   // Fecha de recarga: se escribe una sola vez; queda guardada (vencimiento = recarga + 1 año)
   // y aparece como valor predeterminado en las siguientes inspecciones.
   let panelRecargaDefault = "";
+  let panelOpenedHora = "";   // hora en que se abrió el formulario = cuándo se empezó la inspección
   function updateRecargaHint(){
     const v = $("#mRecarga").value;
     $("#mRecargaHint").textContent = v
@@ -1777,7 +1838,7 @@
     });
     const hasIssues = checklist.some(c=>c.val==='bad');
     const record = {
-      id: uid(), extId: activeExtId, date: $("#mDate").value || todayISO(),
+      id: uid(), extId: activeExtId, date: $("#mDate").value || todayISO(), hora: panelOpenedHora || nowHHMM(),
       inspector: $("#mInspector").value.trim(), checklist, hasIssues,
       obs: $("#mObs").value.trim(), signature: sigDataUrl('mSig')
     };
@@ -1789,37 +1850,25 @@
       extSaved.vencimiento = nuevoVenc;
     }
     const locSaved = extSaved ? extSaved.location : null;
-    const before = locSaved ? roundInfo(locSaved) : null;
+    const before = locSaved ? roundState(locSaved) : null;
     data.inspections.push(record);
-    const after = locSaved ? roundInfo(locSaved) : null;
-    // La inspección del KM se completa cuando este registro deja al KM sin extintores pendientes.
-    const kmCompleted = !!(before && after && !before.complete && after.complete);
+    const stAfter = locSaved ? roundState(locSaved) : null;
+    // La inspección del KM se completa cuando este registro cierra la ronda (todos los extintores inspeccionados).
+    const kmCompleted = !!(before && stAfter && stAfter.done.length > before.done.length);
+    const doneRound = kmCompleted ? { ...stAfter.done[stAfter.done.length-1], loc: locSaved, total: stAfter.total, done: stAfter.done[stAfter.done.length-1].count, complete: true } : null;
     closePanel();
     goHome();
     const savedMsg = hasIssues ? "Inspección guardada — se registraron no conformidades." : "Inspección guardada.";
-    const kmStarted = !!(before && after && !before.started && after.started && !after.complete);
-    toast(kmStarted ? `${savedMsg} Se inició la inspección de ${locSaved} (${after.done} de ${after.total}).` : savedMsg);
+    const kmStarted = !!(before && stAfter && !kmCompleted && stAfter.open && stAfter.open.count === 1 && !(before.open && before.open.startKey === stAfter.open.startKey));
+    toast(kmStarted ? `${savedMsg} Se inició la inspección ${stAfter.open.n} de ${locSaved} (1 de ${stAfter.total}).` : savedMsg);
     const savePromise = apiPost('addInspection', record);
     if(kmCompleted){
       (async()=>{
         let r = null;
-        try{ r = await makeKmRoundPdf(locSaved); }catch(e){ console.error(e); }
+        try{ r = await makeKmRoundPdf(locSaved, doneRound); }catch(e){ console.error(e); }
         if(!r) toast(`${savedMsg} ${locSaved}: inspección completa, pero no se pudo generar el PDF. Descárguelo desde Inicio.`);
         else if(getAutoPdf()){ r.doc.save(r.filename); toast(`${savedMsg} ${locSaved}: inspección completa, informe PDF descargado.`); }
         else toast(`${savedMsg} ${locSaved}: inspección completa; descargue el informe desde Inicio.`);
-        // Aviso por correo (si el administrador configuró destinatarios en Code.gs), con el informe adjunto.
-        let pdf = '';
-        try{ if(r) pdf = r.doc.output('datauristring').split(',')[1] || ''; }catch(e){ console.error(e); }
-        const nc = after.insps.filter(i=>i.hasIssues).map(i=>{
-          const e = data.extinguishers.find(x=>x.id===i.extId) || {};
-          return { code: e.code || '', items: (i.checklist||[]).filter(c=>c.val==='bad').map(c=>c.label) };
-        });
-        await savePromise;
-        const nres = await apiPost('notifyKmComplete', {
-          loc: locSaved, total: after.total, done: after.done, from: after.from, to: after.to, nc,
-          inspector: record.inspector, filename: r ? r.filename : '', pdf
-        });
-        if(!nres.ok) console.warn('No se pudo enviar el aviso por correo', nres);
       })();
     }
     const res = await savePromise;
