@@ -99,6 +99,9 @@
     font-size:12.5px;color:var(--ink-dim);
   }
   .pendingbar.show{display:block;}
+  .obsbar{display:none;background:var(--amber-dim);border:1px solid var(--amber);color:#FFD25A;border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-bottom:12px;}
+  .obsbar.show{display:block;}
+  .obsbar strong{color:#FFE08A;}
   .ext-loc{font-weight:700;font-size:13.5px;color:var(--ink);margin:2px 0 1px;}
   .rounds{display:none;margin-bottom:20px;}
   .rounds.show{display:block;}
@@ -373,6 +376,7 @@
   </nav>
 
   <div class="alertbar" id="alertBar"></div>
+  <div class="obsbar" id="obsBar"></div>
   <div class="pendingbar" id="pendingBar"></div>
   <div class="rounds" id="roundsRoot"></div>
 
@@ -689,7 +693,14 @@
   function obsHtml(text){ return text ? `<span class="obs">${escapeHtml(text)}</span>` : ""; }
 
   const LEVEL_ORDER = {ok:0, warn2:1, warn1:2, bad:3};
-  const LEVEL_LABEL = {ok:"AL DÍA", warn2:"VENCE EN 2 MESES", warn1:"VENCE EN 1 MES", bad:"ATENCIÓN"};
+  const LEVEL_LABEL = {ok:"AL DÍA", warn2:"VENCE PRONTO", warn1:"VENCE PRONTO", bad:"ATENCIÓN"};
+  // Etiqueta de la tarjeta: días exactos que faltan para el vencimiento más próximo.
+  function levelLabel(st){
+    if((st.level === 'warn1' || st.level === 'warn2') && st.expDays !== null && st.expDays !== undefined){
+      return st.expDays === 0 ? 'VENCE HOY' : (st.expDays === 1 ? 'VENCE EN 1 DÍA' : `VENCE EN ${st.expDays} DÍAS`);
+    }
+    return LEVEL_LABEL[st.level];
+  }
 
   // Returns {level, reasons[{level,text}], inspectionMissing}. level is the worst of:
   // ok < warn2 (≤60d) < warn1 (≤30d) < bad (overdue / non-conforming / used).
@@ -701,9 +712,11 @@
       if(LEVEL_ORDER[newLevel] > LEVEL_ORDER[level]) level = newLevel;
       reasons.push({ level: newLevel, text: reason });
     }
+    let expDays = null;   // días que faltan para el vencimiento más próximo (0 a 60)
     function checkDate(dateStr, vencidoMsg, m1Msg, m2Msg){
       if(!dateStr) return;
-      const days = Math.floor((new Date(dateStr) - now)/DAY);
+      const days = daysBetweenISO(todayISO(), dateOnly(dateStr));
+      if(days >= 0 && days <= 60) expDays = (expDays === null) ? days : Math.min(expDays, days);
       if(days < 0) bump('bad', vencidoMsg);
       else if(days <= 30) bump('warn1', m1Msg);
       else if(days <= 60) bump('warn2', m2Msg);
@@ -714,7 +727,7 @@
     }
     let recargaDue = '';
     if(ext.vencimiento){
-      const dd = Math.floor((new Date(ext.vencimiento) - now)/DAY);
+      const dd = daysBetweenISO(todayISO(), dateOnly(ext.vencimiento));
       if(dd >= 0 && dd <= 60) recargaDue = dateOnly(ext.vencimiento);
     }
     checkDate(ext.vencimiento,
@@ -754,7 +767,7 @@
     // Solo se muestran los motivos que corresponden a la gravedad final (evita mostrar
     // un motivo leve cuando el estado real del extintor es más grave por otra causa).
     const topReasons = reasons.filter(r => r.level === level).map(r => r.text);
-    return { level, reasons: topReasons, inspectionMissing, ncItems, recargaDue, enRecarga: enRecarga ? dateOnly(enRecarga.date) : '', lastObs: (insp && !insp.obsResuelta) ? (insp.obs||'').trim() : '', lastObsId: insp ? insp.id : '' };
+    return { level, reasons: topReasons, inspectionMissing, ncItems, recargaDue, expDays, enRecarga: enRecarga ? dateOnly(enRecarga.date) : '', lastObs: (insp && !insp.obsResuelta) ? (insp.obs||'').trim() : '', lastObsId: insp ? insp.id : '' };
   }
 
   // ---------- rendering ----------
@@ -803,6 +816,15 @@
       bar.classList.remove('show');
     }
 
+    const obsList = statuses.filter(x=>x.s.lastObs);
+    const obsBar = $("#obsBar");
+    if(obsList.length){
+      obsBar.innerHTML = `⚠ <strong>${obsList.length}</strong> extintor${obsList.length>1?'es':''} con observación en su última inspección.`;
+      obsBar.classList.add('show');
+    } else {
+      obsBar.classList.remove('show');
+    }
+
     const pendingBar = $("#pendingBar");
     if(pendingInspList.length){
       pendingBar.innerHTML = `${pendingInspList.length} extintor${pendingInspList.length>1?'es':''} sin inspección en los últimos 30 días.`;
@@ -848,7 +870,7 @@
           <div class="ext-type">${escapeHtml(ext.tipo||'')} · ${escapeHtml(ext.capacidad||'—')}</div>
           ${ext.vencimiento ? `<div class="rec-box">Vence: ${fmtFull(dateOnly(ext.vencimiento))}</div>` : ''}
         </div>
-        ${status.enRecarga ? `<span class="badge rcb">EN RECARGA</span>` : (status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${LEVEL_LABEL[status.level]}</span>`}
+        ${status.enRecarga ? `<span class="badge rcb">EN RECARGA</span>` : (status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${levelLabel(status)}</span>`}
       </div>
       <div class="ext-meta">Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
       ${shownReasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(shownReasons.join('; '))}</div>` : ''}
