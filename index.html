@@ -156,6 +156,16 @@
   table.rep td.total{font-weight:700;}
   .rep-h2{font-size:15px;margin:24px 0 10px;font-weight:600;}
   .rep-note{font-size:12px;color:var(--ink-faint);margin-top:12px;line-height:1.6;}
+  .hist-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;}
+  .hist-filters label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--ink-dim);font-weight:500;}
+  .hist-filters select,.hist-filters input{background:var(--surface-3);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:9px 10px;font-size:14px;font-family:inherit;min-width:140px;}
+  .hist-count{margin-left:auto;font-size:12.5px;color:var(--ink-faint);}
+  .hist-row{display:flex;justify-content:space-between;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px;}
+  .hist-title{font-family:'Oswald',system-ui,sans-serif;font-size:16px;letter-spacing:.03em;}
+  .hist-date{font-size:13.5px;font-weight:600;margin-top:2px;}
+  .hist-who{font-size:13px;color:var(--ink-dim);margin-top:3px;}
+  .hist-meta{font-size:12px;color:var(--ink-faint);margin-top:2px;}
+  .hist-dl{white-space:nowrap;}
   .rep-empty{padding:22px;text-align:center;color:var(--ink-faint);font-size:13px;}
 
   /* no conformidades por corregir */
@@ -380,7 +390,7 @@
 
   <nav class="viewnav" id="viewNav">
     <button type="button" class="viewbtn active" data-view="home">Inicio</button>
-    <button type="button" class="viewbtn" data-view="reporte">Registros</button>
+    <button type="button" class="viewbtn" data-view="reporte">Historial</button>
   </nav>
 
   <div class="alertbar" id="alertBar"></div>
@@ -1119,59 +1129,60 @@
   function weekTotal(usage, wk){ return weekPeople(usage, wk).reduce((n,p)=>n+p.total, 0); }
 
   let reportWeek = null;   // lunes de la semana mostrada
+  // ---------- Historial: un informe PDF por cada inspección completa de un KM ----------
+  const histFilter = { loc:'', from:'', to:'' };
+  function historyEntries(){
+    const out = [];
+    LOCATIONS.forEach(loc=>{
+      roundState(loc).done.forEach(sn=>{
+        const names = []; sn.insps.forEach(i=>{ const n = (i.inspector||'').trim(); if(n && !names.includes(n)) names.push(n); });
+        const last = sn.insps.slice().sort((x,y)=> inspKey(x).localeCompare(inspKey(y))).pop();
+        out.push({ loc, n: sn.n, snap: { ...sn, loc, total: sn.count, done: sn.count, complete: true },
+                   endDate: dateOnly(sn.endDate || sn.to), endHora: sn.endHora || '', startDate: sn.startDate, startHora: sn.startHora || '',
+                   names, closer: last ? (last.inspector||'').trim() : '', count: sn.count });
+      });
+    });
+    return out.sort((x,y)=> (y.endDate + ' ' + y.endHora).localeCompare(x.endDate + ' ' + x.endHora) || x.loc.localeCompare(y.loc));
+  }
+  function renderHistoryList(){
+    const box = $("#histList"); if(!box) return;
+    const all = historyEntries();
+    const list = all.filter(e=> (!histFilter.loc || e.loc === histFilter.loc)
+      && (!histFilter.from || e.endDate >= histFilter.from) && (!histFilter.to || e.endDate <= histFilter.to));
+    if(!list.length){
+      box.innerHTML = `<div class="rep-empty">${all.length ? 'Ningún informe coincide con los filtros.' : 'Aún no hay informes. Se guardan aquí al completar la inspección de un KM.'}</div>`;
+      $("#histCount").textContent = all.length ? `0 de ${all.length}` : '';
+      return;
+    }
+    $("#histCount").textContent = `${list.length} informe${list.length>1?'s':''}`;
+    box.innerHTML = list.map((e,i)=>`
+      <div class="hist-row">
+        <div class="hist-main">
+          <div class="hist-title">${e.loc} · Informe n.º ${e.n}</div>
+          <div class="hist-date">Inspección: ${fmtFull(e.endDate)}${e.endHora ? ', ' + e.endHora : ''}</div>
+          <div class="hist-who"><strong>Inspeccionó:</strong> ${e.names.length ? escapeHtml(e.names.join(', ')) : '—'}${e.closer ? ` · <strong>Cerró:</strong> ${escapeHtml(e.closer)}` : ''}</div>
+          <div class="hist-meta">${e.count} extintor${e.count>1?"es":""}${e.startDate && e.startDate !== e.endDate ? ` · iniciada el ${fmtLong(e.startDate)}` : ''}</div>
+        </div>
+        <button type="button" class="btn ghost hist-dl" data-i="${i}">Descargar PDF</button>
+      </div>`).join('');
+    $$('.hist-dl', box).forEach(b=> b.onclick = ()=>{ const e = list[+b.dataset.i]; runPdf(b, ()=>makeKmRoundPdf(e.loc, e.snap)); });
+  }
   function renderReporte(){
     const root = $("#reporteRoot");
-    const usage = buildUsage();
-    const thisWeek = weekStartOf(todayISO());
-    if(!reportWeek) reportWeek = thisWeek;
-    const people = weekPeople(usage, reportWeek);
-    const total = people.reduce((n,p)=>n+p.total, 0);
-    const prevTotal = weekTotal(usage, shiftISO(reportWeek, -7));
-
-    // historial: de la semana con registros más antigua hasta la actual (máx. 12)
-    const allWeeks = Object.keys(usage.weeks).concat([thisWeek]).sort();
-    const first = allWeeks[0];
-    const hist = [];
-    for(let wk = thisWeek; wk >= first && hist.length < 12; wk = shiftISO(wk, -7)) hist.push(wk);
-
-    root.innerHTML = pdfPanelHtml() + `
-      <div class="rep-head">
-        <div class="rep-week">
-          <button class="btn ghost" id="repPrev" type="button">◀</button>
-          <div class="label">Semana del ${weekLabel(reportWeek)}</div>
-          <button class="btn ghost" id="repNext" type="button" ${reportWeek >= thisWeek ? 'disabled' : ''}>▶</button>
-          ${reportWeek !== thisWeek ? '<button class="btn subtle" id="repNow" type="button">Esta semana</button>' : ''}
-        </div>
-        <button class="btn subtle" id="repCsv" type="button">Descargar CSV</button>
+    root.innerHTML = `
+      <div class="hist-filters">
+        <label>KM<select id="hfLoc"><option value="">Todos</option>${LOCATIONS.map(l=>`<option value="${l}"${histFilter.loc===l?' selected':''}>${l}</option>`).join('')}</select></label>
+        <label>Desde<input type="date" id="hfFrom" value="${histFilter.from}"></label>
+        <label>Hasta<input type="date" id="hfTo" value="${histFilter.to}"></label>
+        <button type="button" class="btn subtle" id="hfClear">Limpiar filtros</button>
+        <span class="hist-count" id="histCount"></span>
       </div>
-
-      <div class="rep-tiles">
-        <div class="rep-tile"><div class="n">${total}</div><div class="t">Registros en la semana</div></div>
-        <div class="rep-tile"><div class="n">${people.length}</div><div class="t">Personas que usaron la plataforma</div></div>
-        <div class="rep-tile"><div class="n">${prevTotal}</div><div class="t">Registros la semana anterior</div></div>
-      </div>
-
-      <div class="rep-scroll">${
-        people.length ? `<table class="rep">
-          <thead><tr><th>Persona</th><th class="num">Inspecciones</th><th class="num">Recargas</th><th class="num">Descargas reportadas</th><th class="num">Total</th></tr></thead>
-          <tbody>${people.map(p=>`<tr><td>${escapeHtml(p.name)}</td><td class="num">${p.insp}</td><td class="num">${p.mant}</td><td class="num">${p.uso}</td><td class="num total">${p.total}</td></tr>`).join('')}</tbody>
-        </table>` : `<div class="rep-empty">Sin registros en esta semana.</div>`}
-      </div>
-
-      <h2 class="rep-h2">Historial por semana</h2>
-      <div class="rep-scroll"><table class="rep">
-        <thead><tr><th>Semana</th><th class="num">Personas</th><th class="num">Registros</th></tr></thead>
-        <tbody>${hist.map(wk=>`<tr class="clickable ${wk===reportWeek?'sel':''}" data-week="${wk}"><td>${weekLabel(wk)}${wk===thisWeek?' · actual':''}</td><td class="num">${weekPeople(usage,wk).length}</td><td class="num total">${weekTotal(usage,wk)}</td></tr>`).join('')}</tbody>
-      </table></div>
-
-      <div class="rep-note">Cuenta los registros guardados con nombre: inspecciones mensuales (inspector), recargas terminadas (responsable) y descargas reportadas (quien reporta). Semana de lunes a domingo, según la fecha del registro. Las diferencias de mayúsculas, tildes o espacios en un nombre se agrupan como la misma persona.</div>`;
-
-    $("#repPrev").onclick = ()=>{ reportWeek = shiftISO(reportWeek, -7); renderReporte(); };
-    $("#repNext").onclick = ()=>{ if(reportWeek < thisWeek){ reportWeek = shiftISO(reportWeek, 7); renderReporte(); } };
-    const now = $("#repNow"); if(now) now.onclick = ()=>{ reportWeek = thisWeek; renderReporte(); };
-    $$('#reporteRoot tr.clickable').forEach(tr=> tr.onclick = ()=>{ reportWeek = tr.dataset.week; renderReporte(); });
-    $("#repCsv").onclick = ()=> downloadUsageCsv(usage);
-    bindPdfPanel();
+      <div id="histList"></div>`;
+    $("#hfLoc").onchange = e=>{ histFilter.loc = e.target.value; renderHistoryList(); };
+    $("#hfFrom").onchange = e=>{ histFilter.from = e.target.value; renderHistoryList(); };
+    $("#hfTo").onchange = e=>{ histFilter.to = e.target.value; renderHistoryList(); };
+    $("#hfClear").onclick = ()=>{ histFilter.loc = histFilter.from = histFilter.to = ''; renderReporte(); };
+    renderHistoryList();
   }
 
   function downloadUsageCsv(usage){
@@ -1595,7 +1606,7 @@
     renderRouteStrip();
     renderAlertBar();
     renderRounds();
-    // El resumen (alertas y avance por KM) solo se ve en Inicio; al entrar a un KM o a Registros se oculta.
+    // El resumen (alertas y avance por KM) solo se ve en Inicio; al entrar a un KM o a Historial se oculta.
     if(!home || activeLocation){ ['alertBar','ncBar','obsBar','pendingBar','roundsRoot'].forEach(id=>$("#"+id).classList.remove('show')); }
     refreshPeopleNames();
     if(!home) renderReporte(); else if(activeLocation) renderAreas();
