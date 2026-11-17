@@ -600,7 +600,7 @@
   const DAY = 86400000;
 
   let data = { extinguishers: [], inspections: [], maintenance: [], usageReports: [] };
-  let activeLocation = LOCATIONS[0];
+  let activeLocation = null;   // null = Inicio/resumen (sin lista de extintores)
   let activeExtId = null;
   let addingForArea = null;
   let sigCanvases = {};
@@ -788,6 +788,11 @@
   // ---------- rendering ----------
   function renderRouteStrip(){
     const el = $("#routeStrip"); el.innerHTML = "";
+    const home = document.createElement('div');
+    home.className = "km" + (activeLocation===null ? " active":"");
+    home.textContent = "Inicio";
+    home.onclick = ()=>{ activeLocation = null; renderAll(); window.scrollTo({top:0, behavior:'smooth'}); };
+    el.appendChild(home);
     LOCATIONS.forEach(loc=>{
       const exts = data.extinguishers.filter(e=>e.location===loc);
       // Rojo: vencido/próximo a vencer/descargado o pendiente de inspección. Anaranjado: no conformidad.
@@ -990,6 +995,7 @@
     $$('.round-row', root).forEach(row=> row.onclick = (ev)=>{
       if(ev.target.closest('.round-pdf, .round-sel')) return;
       activeLocation = row.dataset.loc; renderAll();
+      const t = $("#areasRoot"); if(t && t.scrollIntoView) t.scrollIntoView({behavior:'smooth', block:'start'});
     });
     $$('.round-sel', root).forEach(sel=> sel.onchange = ()=>{
       const i = sel.value; sel.value = '';
@@ -1579,19 +1585,19 @@
     renderAll();
     window.scrollTo({top:0, behavior:'smooth'});
   }
-  $$('.viewbtn').forEach(b=> b.onclick = ()=> setView(b.dataset.view));
+  $$('.viewbtn').forEach(b=> b.onclick = ()=>{ if(b.dataset.view==='home') activeLocation = null; setView(b.dataset.view); });
 
   function renderAll(){
     const home = activeView === "home";
     $("#routeStrip").style.display = home ? "" : "none";
-    $("#areasRoot").style.display = home ? "" : "none";
+    $("#areasRoot").style.display = (home && activeLocation) ? "" : "none";
     $("#reporteRoot").style.display = home ? "none" : "";
     renderRouteStrip();
     renderAlertBar();
     renderRounds();
     if(!home){ ['alertBar','ncBar','obsBar','pendingBar'].forEach(id=>$("#"+id).classList.remove('show')); }
     refreshPeopleNames();
-    if(home) renderAreas(); else renderReporte();
+    if(!home) renderReporte(); else if(activeLocation) renderAreas();
   }
 
   // Vuelve a la pantalla principal (Inicio), arriba del todo.
