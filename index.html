@@ -1595,7 +1595,8 @@
     renderRouteStrip();
     renderAlertBar();
     renderRounds();
-    if(!home){ ['alertBar','ncBar','obsBar','pendingBar'].forEach(id=>$("#"+id).classList.remove('show')); }
+    // El resumen (alertas y avance por KM) solo se ve en Inicio; al entrar a un KM o a Registros se oculta.
+    if(!home || activeLocation){ ['alertBar','ncBar','obsBar','pendingBar','roundsRoot'].forEach(id=>$("#"+id).classList.remove('show')); }
     refreshPeopleNames();
     if(!home) renderReporte(); else if(activeLocation) renderAreas();
   }
