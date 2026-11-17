@@ -824,16 +824,16 @@
 
     // Rojo: vencidos / próximos a vencer / descargados
     const lines = [];
-    if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como descargado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
-    if(fechaVencidaList.length) lines.push(`<div class="line"><strong>${fechaVencidaList.length}</strong> con fecha vencida (recarga, prueba hidrostática o mantenimiento anual).</div>`);
-    if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
-    if(warn2List.length) lines.push(`<div class="line"><strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
+    if(usadoList.length) lines.push(`<div class="line">⌛︎ <strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como descargado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
+    if(fechaVencidaList.length) lines.push(`<div class="line">⌛︎ <strong>${fechaVencidaList.length}</strong> con fecha vencida (recarga, prueba hidrostática o mantenimiento anual).</div>`);
+    if(warn1List.length) lines.push(`<div class="line">⌛︎ <strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
+    if(warn2List.length) lines.push(`<div class="line">⌛︎ <strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
     if(lines.length){ bar.innerHTML = lines.join(''); bar.classList.add('show'); } else bar.classList.remove('show');
 
     // Anaranjado: no conformidades sin resolver
     const ncBar = $("#ncBar");
     if(ncList.length){
-      ncBar.innerHTML = `<strong>${ncList.length}</strong> extintor${ncList.length>1?'es':''} con no conformidad sin resolver de su última inspección.`;
+      ncBar.innerHTML = `✖︎ <strong>${ncList.length}</strong> extintor${ncList.length>1?'es':''} con no conformidad sin resolver de su última inspección.`;
       ncBar.classList.add('show');
     } else ncBar.classList.remove('show');
 
