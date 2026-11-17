@@ -502,6 +502,17 @@
 </div>
 
 <!-- Add extinguisher modal -->
+<div class="modal-scrim" id="restartScrim">
+  <div class="modal">
+    <h3>¿Seguro que quiere reiniciar la inspección?</h3>
+    <p id="restartText" style="font-size:13.5px;color:var(--ink-dim);line-height:1.5;margin:0 0 14px;"></p>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn ghost" id="restartNo">No</button>
+      <button class="btn primary" id="restartYes">Sí</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-scrim" id="addScrim">
   <div class="modal">
     <h3>Nuevo extintor</h3>
@@ -650,6 +661,8 @@
       try{ json = await res.json(); }
       catch(parseErr){ throw new Error("la respuesta no es JSON (probablemente una página de inicio de sesión de Google)"); }
       data = Object.assign({extinguishers:[],inspections:[],maintenance:[],usageReports:[]}, json);
+      // Inspecciones descartadas al reiniciar una inspección: se conservan en la hoja pero no cuentan.
+      data.inspections = (data.inspections || []).filter(i=>!i.anulada);
       return { ok:true };
     }catch(e){
       console.error(e);
@@ -987,11 +1000,9 @@
     if(!list.length || activeView !== 'home'){ root.classList.remove('show'); root.innerHTML = ''; return; }
     root.innerHTML = `<h2>Avance de inspección por KM</h2>` + list.map(r=>{
       const pct = Math.round(r.done / r.total * 100);
-      const prevBtn = (!r.complete && r.prev) ? `<button type="button" class="btn ghost round-pdf" data-loc="${r.loc}" data-prev="1">Informe de la inspección ${r.prev.n}</button>` : '';
-      // Con dos o más inspecciones completas: menú para elegir el reporte original o el actualizado.
-      const reportCtl = r.completed >= 2
-        ? `<select class="round-sel" data-loc="${r.loc}" aria-label="Descargar informe"><option value="">Descargar informe…</option>${r.doneList.map((sn,i)=>`<option value="${i}">${i === 0 ? 'Reporte original' : (i === r.doneList.length - 1 ? 'Reporte actualizado' : 'Reporte ' + sn.n)}</option>`).join('')}</select>`
-        : (r.complete ? `<button type="button" class="btn ghost round-pdf" data-loc="${r.loc}">Descargar informe</button>` : prevBtn);
+      // Solo la inspección completa vigente tiene botón; al empezar otra, los informes anteriores quedan en Historial.
+      const reportCtl = r.complete ? `<button type="button" class="btn ghost round-pdf" data-loc="${r.loc}">Descargar informe</button>`
+        : ((!r.stale && r.insps && r.insps.length) ? `<button type="button" class="btn ghost round-restart" data-loc="${r.loc}">Reiniciar inspección</button>` : '');
       return `<div class="round-row${r.complete?' complete':''}${r.stale?' stale':''}${r.loc===activeLocation?' active':''}" data-loc="${r.loc}">
         <div class="round-top"><span class="km-name">${r.loc} · Inspección ${r.n}<span class="rcount" title="Inspecciones completadas" aria-label="Inspecciones completadas: ${r.completed}">${r.completed}</span></span>
           <span class="count">${r.complete ? `Inspección completa el ${fmtLongDT(r.endDate, r.endHora)} · ` : ''}${r.done} de ${r.total} extintores (${pct}%)</span></div>
@@ -1003,7 +1014,7 @@
     }).join('');
     root.classList.add('show');
     $$('.round-row', root).forEach(row=> row.onclick = (ev)=>{
-      if(ev.target.closest('.round-pdf, .round-sel')) return;
+      if(ev.target.closest('.round-pdf, .round-sel, .round-restart')) return;
       activeLocation = row.dataset.loc; renderAll();
       const t = $("#areasRoot"); if(t && t.scrollIntoView) t.scrollIntoView({behavior:'smooth', block:'start'});
     });
@@ -1013,11 +1024,36 @@
       const snap = roundInfo(sel.dataset.loc).doneList[+i];
       if(snap) runPdf(null, ()=>makeKmRoundPdf(sel.dataset.loc, snap));
     });
+    $$('.round-restart', root).forEach(b=> b.onclick = ()=> askRestartRound(b.dataset.loc));
     $$('.round-pdf', root).forEach(b=> b.onclick = ()=> runPdf(b, ()=>{
       const info = roundInfo(b.dataset.loc);
       return makeKmRoundPdf(b.dataset.loc, b.dataset.prev ? info.prev : info);
     }));
   }
+
+  // Reiniciar la inspección en curso de un KM: se descartan sus inspecciones y cada extintor vuelve a su inspección anterior.
+  let restartLoc = null;
+  function askRestartRound(loc){
+    const open = roundState(loc).open;
+    if(!open || !open.insps.length) return;
+    restartLoc = loc;
+    $("#restartText").textContent = `Se descartarán las ${open.insps.length} inspección${open.insps.length>1?'es':''} de la inspección en curso de ${loc}, y los extintores volverán a su inspección anterior.`;
+    $("#restartScrim").classList.add('show');
+  }
+  $("#restartNo").onclick = ()=>{ restartLoc = null; $("#restartScrim").classList.remove('show'); };
+  $("#restartScrim").addEventListener('click', e=>{ if(e.target.id==='restartScrim') $("#restartNo").onclick(); });
+  $("#restartYes").onclick = async ()=>{
+    const loc = restartLoc; restartLoc = null; $("#restartScrim").classList.remove('show');
+    const open = loc ? roundState(loc).open : null;
+    if(!open || !open.insps.length) return;
+    const ids = open.insps.map(i=>i.id);
+    const removed = data.inspections.filter(i=>ids.includes(i.id));
+    data.inspections = data.inspections.filter(i=>!ids.includes(i.id));
+    renderAll();
+    toast(`Inspección de ${loc} reiniciada.`);
+    const res = await apiPost('voidInspections', { ids, fecha: todayISO() });
+    if(res && res.ok === false){ data.inspections = data.inspections.concat(removed); renderAll(); toast('No se pudo reiniciar la inspección. Intente de nuevo.'); }
+  };
 
   function renderAreas(){
     const root = $("#areasRoot");
@@ -1142,7 +1178,7 @@
                    names, closer: last ? (last.inspector||'').trim() : '', count: sn.count });
       });
     });
-    return out.sort((x,y)=> (y.endDate + ' ' + y.endHora).localeCompare(x.endDate + ' ' + x.endHora) || x.loc.localeCompare(y.loc));
+    return out.sort((x,y)=> (y.endDate + ' ' + y.endHora).localeCompare(x.endDate + ' ' + x.endHora) || x.loc.localeCompare(y.loc) || y.n - x.n);
   }
   function renderHistoryList(){
     const box = $("#histList"); if(!box) return;
