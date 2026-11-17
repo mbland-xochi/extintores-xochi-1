@@ -26,8 +26,8 @@
     --red-dim:#FDE4E2;
     --amber:#C99700;
     --amber-dim:#FFF3C4;
-    --orange:#C98A00;
-    --orange-dim:#FFF0C2;
+    --orange:#E8731A;
+    --orange-dim:#FFE5CF;
     --green:#0AA64C;
     --green-dim:#DDF3E6;
     --focus:#1FB3E5;
@@ -79,9 +79,9 @@
     margin-right:6px;background:var(--ink-faint);position:relative;top:-1px;
   }
   .route-strip .km .dot.ok{background:var(--green);}
-  .route-strip .km .dot.warn2{background:var(--amber);}
-  .route-strip .km .dot.warn1{background:var(--amber);}
-  .route-strip .km .dot.bad{background:var(--red);}
+  .route-strip .km .dot.yellow{background:var(--amber);}
+  .route-strip .km .dot.orange{background:var(--orange);}
+  .route-strip .km .dot.red{background:var(--red);}
 
   /* ---------- Alert banner ---------- */
   .alertbar{
@@ -99,6 +99,10 @@
     font-size:12.5px;color:var(--ink-dim);
   }
   .pendingbar.show{display:block;}
+  .ncbar{display:none;background:var(--orange-dim);border:1px solid var(--orange);color:#8A3D00;border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-bottom:12px;}
+  .ncbar.show{display:block;}
+  .ncbar strong{color:#6B2F00;}
+  .alertbar{margin-bottom:12px !important;}
   .obsbar{display:none;background:var(--amber-dim);border:1px solid var(--amber);color:#7A5600;border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-bottom:12px;}
   .obsbar.show{display:block;}
   .obsbar strong{color:#5C4000;}
@@ -155,10 +159,10 @@
   .rep-empty{padding:22px;text-align:center;color:var(--ink-faint);font-size:13px;}
 
   /* no conformidades por corregir */
-  .nc-box{margin-top:7px;padding:8px 10px;border-left:3px solid var(--red);background:var(--red-dim);border-radius:0 6px 6px 0;}
-  .nc-title{display:block;font-size:10.5px;color:#8A1F1A;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
-  .nc-list{margin:0;padding-left:16px;font-size:12.5px;font-weight:700;color:#7A1410;line-height:1.5;}
-  .nc-obs{margin-top:6px;font-size:12px;color:#8A1F1A;}
+  .nc-box{margin-top:7px;padding:8px 10px;border-left:3px solid var(--orange);background:var(--orange-dim);border-radius:0 6px 6px 0;}
+  .nc-title{display:block;font-size:10.5px;color:#8A3D00;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+  .nc-list{margin:0;padding-left:16px;font-size:12.5px;font-weight:700;color:#6B2F00;line-height:1.5;}
+  .nc-obs{margin-top:6px;font-size:12px;color:#8A3D00;}
   #ncBanner .nc-box{margin:0 0 14px;}
 
   /* reporte PDF */
@@ -174,9 +178,13 @@
 
   /* observaciones siempre en negrita */
   .obs{font-weight:700;color:var(--ink);}
-  .ext-card.warn1{background:var(--amber-dim);border-color:var(--amber);}
-  .ext-card.warn1 .obs-warn{background:rgba(0,0,0,.06);}
+  .ext-card.c-red{background:var(--red-dim);border-color:var(--red);}
+  .ext-card.c-orange{background:var(--orange-dim);border-color:var(--orange);}
+  .ext-card.c-yellow{background:var(--amber-dim);border-color:var(--amber);}
+  .ext-card.c-red .obs-warn,.ext-card.c-orange .obs-warn,.ext-card.c-yellow .obs-warn{background:rgba(0,0,0,.06);}
+  .ext-card.c-red .nc-box{background:rgba(0,0,0,.06);}
   .ext-warn{margin-top:6px;font-weight:700;font-size:13px;color:#7A5600;}
+  .ext-warn.red{color:#9B1C1C;}
   #mRecarga{font-weight:700;}
   .rc-status{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--ink-dim);margin-bottom:12px;line-height:1.5;}
   .rc-status strong{color:var(--ink);}
@@ -238,14 +246,14 @@
     border-radius:20px;white-space:nowrap;
   }
   .badge.ok{background:var(--green-dim);color:#0B7A38;}
-  .badge.warn2{background:var(--amber-dim);color:#7A5600;}
-  .badge.warn1{background:var(--orange-dim);color:#7A5600;}
-  .badge.bad{background:var(--red-dim);color:#9B1C1C;}
+  .badge.red{background:var(--red-dim);color:#9B1C1C;}
+  .badge.orange{background:var(--orange-dim);color:#8A3D00;}
+  .badge.yellow{background:var(--amber-dim);color:#7A5600;}
   .badge.pend{background:var(--red-dim);color:#9B1C1C;}
   .badge.rcb{background:var(--surface-3);color:var(--ink-dim);}
   .ext-pend{margin-top:6px;font-weight:700;font-size:13px;color:#C62828;letter-spacing:.03em;}
   .rec-box{display:inline-block;margin-top:7px;padding:6px 10px;border:1px solid var(--ink-faint);border-radius:6px;background:var(--surface-3);font-weight:700;font-size:13px;color:var(--ink);line-height:1.5;}
-  .ext-card.warn1 .rec-box{background:rgba(0,0,0,.06);border-color:var(--amber);}
+  .ext-card.c-red .rec-box,.ext-card.c-orange .rec-box,.ext-card.c-yellow .rec-box{background:rgba(0,0,0,.06);border-color:var(--amber);}
   .ext-meta{font-size:11px;color:var(--ink-faint);margin-top:6px;}
   .used-banner{
     background:var(--red-dim);border:1px solid #E6B1AD;border-radius:8px;
@@ -376,6 +384,7 @@
   </nav>
 
   <div class="alertbar" id="alertBar"></div>
+  <div class="ncbar" id="ncBar"></div>
   <div class="obsbar" id="obsBar"></div>
   <div class="pendingbar" id="pendingBar"></div>
   <div class="rounds" id="roundsRoot"></div>
@@ -712,10 +721,12 @@
       if(LEVEL_ORDER[newLevel] > LEVEL_ORDER[level]) level = newLevel;
       reasons.push({ level: newLevel, text: reason });
     }
+    let redFlag = false;  // vencido, próximo a vencer (≤2 meses) o descargado
     let expDays = null;   // días que faltan para el vencimiento más próximo (0 a 60)
     function checkDate(dateStr, vencidoMsg, m1Msg, m2Msg){
       if(!dateStr) return;
       const days = daysBetweenISO(todayISO(), dateOnly(dateStr));
+      if(days <= 60) redFlag = true;
       if(days >= 0 && days <= 60) expDays = (expDays === null) ? days : Math.min(expDays, days);
       if(days < 0) bump('bad', vencidoMsg);
       else if(days <= 30) bump('warn1', m1Msg);
@@ -723,6 +734,7 @@
     }
 
     if(ext.usado){
+      redFlag = true;
       bump('bad', 'Descarga reportada — requiere recarga inmediata');
     }
     let recargaDue = '';
@@ -767,7 +779,10 @@
     // Solo se muestran los motivos que corresponden a la gravedad final (evita mostrar
     // un motivo leve cuando el estado real del extintor es más grave por otra causa).
     const topReasons = reasons.filter(r => r.level === level).map(r => r.text);
-    return { level, reasons: topReasons, inspectionMissing, ncItems, recargaDue, expDays, enRecarga: enRecarga ? dateOnly(enRecarga.date) : '', lastObs: (insp && !insp.obsResuelta) ? (insp.obs||'').trim() : '', lastObsId: insp ? insp.id : '' };
+    const ncFlag = ncItems.length > 0 || reasons.some(r=>r.text.startsWith('No conformidad'));
+    const obsText = (insp && !insp.obsResuelta) ? (insp.obs||'').trim() : '';
+    const color = redFlag ? 'red' : (ncFlag ? 'orange' : (obsText ? 'yellow' : ''));
+    return { color, redFlag, ncFlag, level, reasons: topReasons, inspectionMissing, ncItems, recargaDue, expDays, enRecarga: enRecarga ? dateOnly(enRecarga.date) : '', lastObs: (insp && !insp.obsResuelta) ? (insp.obs||'').trim() : '', lastObsId: insp ? insp.id : '' };
   }
 
   // ---------- rendering ----------
@@ -775,13 +790,14 @@
     const el = $("#routeStrip"); el.innerHTML = "";
     LOCATIONS.forEach(loc=>{
       const exts = data.extinguishers.filter(e=>e.location===loc);
-      // Rojo: algún extintor con no conformidad, pendiente de inspección (o vencido/descargado).
-      // Amarillo: algún extintor próximo a vencer. Verde: todos conformes y sin vencimiento próximo.
+      // Rojo: vencido/próximo a vencer/descargado o pendiente de inspección. Anaranjado: no conformidad.
+      // Amarillo: observación. Verde: todo conforme.
       let dotClass = exts.length ? "ok" : "";
       exts.forEach(e=>{
         const st = extStatus(e);
-        if(st.level === 'bad' || st.inspectionMissing) dotClass = "bad";
-        else if(dotClass !== "bad" && (st.level === 'warn1' || st.level === 'warn2' || st.recargaDue)) dotClass = "warn2";
+        const rank = {ok:0, yellow:1, orange:2, red:3};
+        const c = st.inspectionMissing ? 'red' : (st.color || 'ok');
+        if(rank[c] > rank[dotClass]) dotClass = c;
       });
       const div = document.createElement('div');
       div.className = "km" + (loc===activeLocation ? " active":"");
@@ -795,27 +811,28 @@
     const bar = $("#alertBar");
     const statuses = data.extinguishers.map(e=>({ext:e, s:extStatus(e)}));
     const usadoList = statuses.filter(x=>x.ext.usado);
-    const badList = statuses.filter(x=>x.s.level==='bad' && !x.ext.usado);
-    const noConformidadList = badList.filter(x=>x.s.reasons.some(r=>r.includes('No conformidad')));
-    const fechaVencidaList = badList.filter(x=>x.s.reasons.some(r=>r.includes('fecha vencida')));
+    const fechaVencidaList = statuses.filter(x=>!x.ext.usado && x.s.reasons.some(r=>r.includes('fecha vencida')));
     const warn1List = statuses.filter(x=>x.s.level==='warn1');
     const warn2List = statuses.filter(x=>x.s.level==='warn2');
     const pendingInspList = statuses.filter(x=>x.s.inspectionMissing);
+    const ncList = statuses.filter(x=>x.s.ncFlag);
 
-    const hasUrgent = usadoList.length || badList.length || warn1List.length || warn2List.length;
-    if(hasUrgent){
-      const lines = [];
-      if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como descargado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
-      if(noConformidadList.length) lines.push(`<div class="line"><strong>${noConformidadList.length}</strong> con no conformidad sin resolver de su última inspección.</div>`);
-      if(fechaVencidaList.length) lines.push(`<div class="line"><strong>${fechaVencidaList.length}</strong> con fecha vencida (recarga, prueba hidrostática o mantenimiento anual).</div>`);
-      if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
-      if(warn2List.length) lines.push(`<div class="line"><strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
-      bar.innerHTML = lines.join('');
-      bar.classList.add('show');
-    } else {
-      bar.classList.remove('show');
-    }
+    // Rojo: vencidos / próximos a vencer / descargados
+    const lines = [];
+    if(usadoList.length) lines.push(`<div class="line"><strong>${usadoList.length} extintor${usadoList.length>1?'es':''}</strong> reportado${usadoList.length>1?'s':''} como descargado${usadoList.length>1?'s':''} — requiere${usadoList.length>1?'n':''} recarga inmediata.</div>`);
+    if(fechaVencidaList.length) lines.push(`<div class="line"><strong>${fechaVencidaList.length}</strong> con fecha vencida (recarga, prueba hidrostática o mantenimiento anual).</div>`);
+    if(warn1List.length) lines.push(`<div class="line"><strong>${warn1List.length}</strong> vence${warn1List.length>1?'n':''} en menos de 1 mes.</div>`);
+    if(warn2List.length) lines.push(`<div class="line"><strong>${warn2List.length}</strong> vence${warn2List.length>1?'n':''} en menos de 2 meses.</div>`);
+    if(lines.length){ bar.innerHTML = lines.join(''); bar.classList.add('show'); } else bar.classList.remove('show');
 
+    // Anaranjado: no conformidades sin resolver
+    const ncBar = $("#ncBar");
+    if(ncList.length){
+      ncBar.innerHTML = `<strong>${ncList.length}</strong> extintor${ncList.length>1?'es':''} con no conformidad sin resolver de su última inspección.`;
+      ncBar.classList.add('show');
+    } else ncBar.classList.remove('show');
+
+    // Amarillo: observaciones
     const obsList = statuses.filter(x=>x.s.lastObs);
     const obsBar = $("#obsBar");
     if(obsList.length){
@@ -870,12 +887,12 @@
           <div class="ext-type">${escapeHtml(ext.tipo||'')} · ${escapeHtml(ext.capacidad||'—')}</div>
           ${ext.vencimiento ? `<div class="rec-box">Vence: ${fmtFull(dateOnly(ext.vencimiento))}</div>` : ''}
         </div>
-        ${status.enRecarga ? `<span class="badge rcb">EN RECARGA</span>` : (status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level}">${levelLabel(status)}</span>`}
+        ${status.enRecarga ? `<span class="badge rcb">EN RECARGA</span>` : (status.level==='ok' && status.inspectionMissing) ? `<span class="badge pend">PENDIENTE</span>` : `<span class="badge ${status.level==='ok' ? 'ok' : (status.color || 'red')}">${levelLabel(status)}</span>`}
       </div>
       <div class="ext-meta">Última inspección: ${insp?fmtDate(insp.date):'sin registro'}</div>
       ${shownReasons.length && status.level!=='ok' ? `<div class="ext-meta" style="color:var(--ink-dim);margin-top:2px;">${escapeHtml(shownReasons.join('; '))}</div>` : ''}
       ${status.enRecarga ? `<div class="ext-warn">Recarga en proceso desde el ${fmtDMY(status.enRecarga)}</div>` : ''}
-      ${status.recargaDue ? `<div class="ext-warn">⚠ Recarga vence el ${fmtDMY(status.recargaDue)}</div>` : ''}
+      ${status.recargaDue ? `<div class="ext-warn red">⚠ Recarga vence el ${fmtDMY(status.recargaDue)}</div>` : ''}
       ${ncBoxHtml(status)}
       ${status.inspectionMissing ? `<div class="ext-pend">PENDIENTE de inspección (cada 30 días)</div>` : ''}
     `;
@@ -1013,7 +1030,8 @@
       } else {
         exts.forEach(ext=>{
           const card = document.createElement('div');
-          card.className = "ext-card" + (extStatus(ext).recargaDue ? " warn1" : "");
+          const stc = extStatus(ext).color;
+          card.className = "ext-card" + (stc ? " c-" + stc : "");
           card.innerHTML = extSummaryHtml(ext);
           card.onclick = ()=> openPanel(ext.id);
           wrap.appendChild(card);
@@ -1571,7 +1589,7 @@
     renderRouteStrip();
     renderAlertBar();
     renderRounds();
-    if(!home){ $("#alertBar").classList.remove('show'); $("#pendingBar").classList.remove('show'); }
+    if(!home){ ['alertBar','ncBar','obsBar','pendingBar'].forEach(id=>$("#"+id).classList.remove('show')); }
     refreshPeopleNames();
     if(home) renderAreas(); else renderReporte();
   }
